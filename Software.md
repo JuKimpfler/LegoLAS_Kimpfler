@@ -1,3 +1,6 @@
+zur lego teil wrkennung wird https://brickognize.com/ verwendet. bzw. die api dieser webseite. 
+
+
 # Option A: Android als USB-Webcam (DroidCam)
 
 ## Übersicht
