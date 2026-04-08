@@ -1,0 +1,17 @@
+# LegoLAS Autostart Konfiguration für Raspberry Pi
+#
+# Diese Datei wird unter ~/.config/autostart/ gespeichert:
+#   mkdir -p ~/.config/autostart
+#   cp legolas.desktop ~/.config/autostart/
+#
+# Voraussetzung: LXDE/PIXEL Desktop (Standard Raspberry Pi OS)
+
+[Desktop Entry]
+Type=Application
+Name=LegoLAS
+Comment=LEGO Sortiermaschine Steuerung
+Exec=/home/pi/LegoLAS_Kimpfler/lego_sorter/start_gui.sh
+Icon=application-x-executable
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true

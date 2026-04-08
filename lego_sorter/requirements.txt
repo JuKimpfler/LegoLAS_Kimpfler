@@ -1,0 +1,19 @@
+# LegoLAS – Python-Abhängigkeiten
+# Installieren mit:  pip3 install -r requirements.txt
+
+# API-Kommunikation
+requests>=2.28.0
+
+# Bildverarbeitung / Kamera
+opencv-python>=4.7.0
+Pillow>=9.0.0
+numpy>=1.23.0
+
+# Excel-Dateien (Auftrags- und Exportlisten)
+openpyxl>=3.1.0
+
+# GPIO (nur auf Raspberry Pi benötigt)
+# RPi.GPIO>=0.7.1
+
+# Optional: präzisere Servo-Steuerung via pigpio
+# pigpio>=1.78
