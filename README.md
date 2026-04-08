@@ -6,7 +6,7 @@
 |------------|------------|--------|-----------------|
 | Mikrocontroller | Raspberry Pi 3 | 1 | 5V 2.5A (USB) |
 | Motor-Controller | L298N Dual H-Bridge | 1 | 12V 2A extern |
-| Servo | Continuous Rotation Servo | 1 | 5V (von Raspi) |
+| Servo | 180°| 1 | 5V (von Raspi) |
 | DC-Motor | Förderband-Motor 12V | 1 | über L298N |
 | Sensor | IR Lichtschranke (digital) | 1 | 5V (von Raspi) |
 | Netzteil | 12V 2-3A | 1 | 230V AC → 12V DC |
@@ -128,7 +128,7 @@ Verwendete Pins:
 
 ---
 
-### 2️⃣ Continuous Rotation Servo (Sortierweiche)
+### 2️⃣ Servo (Sortierweiche)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -476,7 +476,7 @@ Position:
 ├── Rampe über Behälter-Reihe
 └── Servo dreht Rampe zu Behältern
 
-Winkel: 6 Behälter = 360° / 6 = 60° Abstand
+ Abstand
 ```
 
 ---
@@ -513,14 +513,3 @@ SICHERHEIT:
 ☐ Keine Quetschgefahr am Band
 ```
 
----
-
-## 📞 Support
-
-Bei Problemen:
-1. Checkliste durchgehen
-2. Log-Ausgaben prüfen
-3. Verkabelung mit Multimeter messen
-4. Komponenten einzeln testen
-
-**Viel Erfolg beim Aufbau! 🚀**
