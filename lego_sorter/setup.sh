@@ -11,7 +11,7 @@ echo "  LegoLAS System-Setup"
 echo "========================================"
 
 # --- System aktualisieren ---
-sudo apt update -y
+sudo apt update
 
 # --- Systempakete ---
 sudo apt install -y \

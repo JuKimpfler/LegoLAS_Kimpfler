@@ -6,7 +6,7 @@ Enthält:
   - Status-Panel (Zustand, letztes Teil, Behälter)
   - Manuelle Steuerung (Band, Scan, Weiche)
   - Umschaltung Manuell / Automatik
-  - Umschaltung Sortiermodus / Auftragsm
+  - Umschaltung Sortiermodus / Auftragsmodus
 
 Tastaturkürzel:
   B        – Band an/aus
