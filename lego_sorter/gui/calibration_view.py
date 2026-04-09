@@ -22,6 +22,7 @@ class CalibrationView(BaseView):
     def _build_ui(self):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # Titel
         ttk.Label(self, text="⚙️  Servo-Kalibrierung",
@@ -38,7 +39,6 @@ class CalibrationView(BaseView):
         outer.grid(row=2, column=0, sticky="nsew", padx=32, pady=4)
         outer.columnconfigure(0, weight=1)
         outer.columnconfigure(1, weight=2)
-        self.rowconfigure(2, weight=1)
 
         # ── Linke Spalte: Steuerung ────────────────────────────────────────
         ctrl = ttk.Frame(outer, style="Surface.TFrame")

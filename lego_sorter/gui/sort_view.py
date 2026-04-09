@@ -75,7 +75,7 @@ class SortView(BaseView):
         # Kamerabild
         self._cam_label = tk.Label(
             cam_outer,
-            bg=cfg.THEME_BG,
+            bg=cfg.THEME_SURFACE,
             text="Kamera wird initialisiert…",
             fg=cfg.THEME_MUTED,
             font=cfg.FONT_BODY,
