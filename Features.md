@@ -181,7 +181,7 @@ IDLE → WAITING_FOR_PART → STOPPING_BELT → SCANNING → SORTING → BELT_RE
 
 ## 9. Kamera (DroidCam)
 
-- Ausschließlich **DroidCam via USB** (ADB Port-Forward auf `tcp:4747`)
+- Ausschließlich **DroidCam**
 - URL: `http://localhost:4747/video` (konfigurierbar)
 - Auflösung: 640 × 480 Pixel
 - Kontinuierlicher Capture-Loop in eigenem Thread (thread-sicher)
