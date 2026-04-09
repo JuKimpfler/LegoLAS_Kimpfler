@@ -45,10 +45,9 @@ DEFAULT_BELT_SPEED   = 60    # Prozent (0-100)
 BELT_STOP_DELAY      = 0.3   # Sekunden – Band hält kurz an vor dem Scan
 
 # ---------------------------------------------------------------------------
-# Kamera
+# Kamera (DroidCam via USB – einzige unterstützte Kameraquelle)
 # ---------------------------------------------------------------------------
-# 0 = /dev/video0, 10 = DroidCam via v4l2loopback
-CAMERA_INDEX         = 0
+# DroidCam läuft auf dem Android-Handy und streamt via USB (ADB Port-Forward)
 DROIDCAM_URL         = "http://localhost:4747/video"
 CAMERA_WIDTH         = 640
 CAMERA_HEIGHT        = 480

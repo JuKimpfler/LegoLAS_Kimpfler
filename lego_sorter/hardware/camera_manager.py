@@ -1,13 +1,10 @@
 """
 Kamera-Manager für LegoLAS.
-Unterstützt:
-  1. Direkte OpenCV-Kamera (/dev/video0 o.ä.)
-  2. DroidCam via HTTP-Stream (USB-Modus)
+Verwendet DroidCam via HTTP-Stream (USB-Modus mit ADB Port-Forward).
 
 Liefert Frames als numpy-Array (BGR) bzw. als PIL-Image für tkinter.
 """
 
-import io
 import logging
 import threading
 import time
@@ -35,18 +32,16 @@ except ImportError:
 class CameraManager:
     """
     Thread-sichere Kamera-Verwaltung mit kontinuierlichem Capture-Loop.
+    Verwendet ausschließlich DroidCam via HTTP-Stream (USB/ADB).
 
     Parameter
     ---------
     config : module
-        Konfigurationsmodul mit CAMERA_INDEX, DROIDCAM_URL, etc.
-    use_droidcam : bool
-        Falls True wird der HTTP-Stream von DroidCam verwendet.
+        Konfigurationsmodul mit DROIDCAM_URL, CAMERA_WIDTH, CAMERA_HEIGHT, LIVE_FPS.
     """
 
-    def __init__(self, config, use_droidcam: bool = False):
+    def __init__(self, config):
         self.cfg = config
-        self._use_droidcam = use_droidcam
         self._cap = None
         self._latest_frame: Optional[np.ndarray] = None
         self._lock = threading.Lock()
@@ -58,7 +53,7 @@ class CameraManager:
     # ------------------------------------------------------------------
 
     def start(self):
-        """Öffnet Kamera und startet Capture-Loop in eigenem Thread."""
+        """Öffnet DroidCam-Stream und startet Capture-Loop in eigenem Thread."""
         if self._running:
             return
         if not _CV2_AVAILABLE:
@@ -69,13 +64,17 @@ class CameraManager:
             self._thread.start()
             return
 
-        if self._use_droidcam:
-            self._cap = cv2.VideoCapture(self.cfg.DROIDCAM_URL)
-        else:
-            self._cap = cv2.VideoCapture(self.cfg.CAMERA_INDEX)
+        self._cap = cv2.VideoCapture(self.cfg.DROIDCAM_URL)
 
         if self._cap is None or not self._cap.isOpened():
-            logger.error("Kamera konnte nicht geöffnet werden.")
+            logger.error(
+                "DroidCam-Stream konnte nicht geöffnet werden (%s). "
+                "Bitte sicherstellen, dass: "
+                "1) DroidCam-App auf dem Handy läuft, "
+                "2) USB-Kabel verbunden ist, "
+                "3) 'adb forward tcp:4747 tcp:4747' ausgeführt wurde.",
+                self.cfg.DROIDCAM_URL,
+            )
             self._cap = None
             self._running = True
             self._thread = threading.Thread(target=self._dummy_loop,
@@ -89,7 +88,7 @@ class CameraManager:
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
-        logger.info("Kamera gestartet (droidcam=%s).", self._use_droidcam)
+        logger.info("DroidCam-Stream gestartet (%s).", self.cfg.DROIDCAM_URL)
 
     def stop(self):
         """Stoppt den Capture-Loop und gibt Ressourcen frei."""
@@ -119,7 +118,7 @@ class CameraManager:
                 time.sleep(sleep_time)
 
     def _dummy_loop(self):
-        """Erzeugt graue Platzhalter-Frames wenn keine Kamera vorhanden."""
+        """Erzeugt graue Platzhalter-Frames wenn kein DroidCam-Stream verfügbar."""
         interval = 1.0 / max(1, self.cfg.LIVE_FPS)
         while self._running:
             frame = np.full(
@@ -127,10 +126,11 @@ class CameraManager:
                 fill_value=50,
                 dtype=np.uint8,
             )
-            # Beschriftung
             if _CV2_AVAILABLE:
-                cv2.putText(frame, "Keine Kamera", (80, 240),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (180, 180, 180), 2)
+                cv2.putText(frame, "DroidCam nicht verbunden", (40, 220),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (180, 180, 180), 2)
+                cv2.putText(frame, "adb forward tcp:4747 tcp:4747", (40, 260),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (140, 140, 140), 1)
             with self._lock:
                 self._latest_frame = frame
             time.sleep(interval)
@@ -184,3 +184,4 @@ class CameraManager:
     @property
     def is_open(self) -> bool:
         return self._running
+

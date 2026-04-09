@@ -74,7 +74,7 @@ class LegoLASApp(tk.Tk):
         self.gpio  = GPIOController(cfg)
         self.gpio.setup()
 
-        self.camera = CameraManager(cfg, use_droidcam=False)
+        self.camera = CameraManager(cfg)
         self.camera.start()
 
         self.api = BrickognizeClient(cfg)
