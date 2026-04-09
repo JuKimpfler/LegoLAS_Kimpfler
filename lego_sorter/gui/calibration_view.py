@@ -21,117 +21,150 @@ class CalibrationView(BaseView):
 
     def _build_ui(self):
         self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
 
         # Titel
         ttk.Label(self, text="⚙️  Servo-Kalibrierung",
                   style="Title.TLabel").grid(
             row=0, column=0, pady=(16, 4), sticky="n")
         ttk.Label(self,
-                  text="Stellen Sie den Servo auf die gewünschte Position\n"
+                  text="Stellen Sie den Servo auf die gewünschte Position "
                        "und speichern Sie diese für jeden Behälter.",
                   style="Muted.TLabel",
-                  justify="center").grid(row=1, column=0, pady=(0, 16))
+                  justify="center").grid(row=1, column=0, pady=(0, 8))
 
-        # Hauptbereich
-        main = ttk.Frame(self, style="Surface.TFrame")
-        main.grid(row=2, column=0, padx=40, pady=8, sticky="n")
-        main.columnconfigure((0, 1, 2), weight=1)
+        # Scroll-fähiger Hauptbereich
+        outer = ttk.Frame(self, style="TFrame")
+        outer.grid(row=2, column=0, sticky="nsew", padx=32, pady=4)
+        outer.columnconfigure(0, weight=1)
+        outer.columnconfigure(1, weight=2)
+        self.rowconfigure(2, weight=1)
 
-        # Aktueller Winkel
-        ttk.Label(main, text="Aktueller Winkel:",
-                  style="Surface.TLabel").grid(
-            row=0, column=0, padx=16, pady=12, sticky="e")
+        # ── Linke Spalte: Steuerung ────────────────────────────────────────
+        ctrl = ttk.Frame(outer, style="Surface.TFrame")
+        ctrl.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=0)
+        ctrl.columnconfigure(0, weight=1)
+
+        # Aktueller Winkel – große Anzeige
+        ttk.Label(ctrl, text="Aktueller Winkel",
+                  style="Surface.TLabel",
+                  font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
+            row=0, column=0, padx=16, pady=(16, 4), sticky="w")
+
         self._angle_var = tk.DoubleVar(value=0.0)
-        self._lbl_angle = ttk.Label(main,
+        self._lbl_angle = ttk.Label(ctrl,
                                     text="0.0 °",
                                     foreground=cfg.THEME_ACCENT,
                                     background=cfg.THEME_SURFACE,
-                                    font=(cfg.FONT_BODY[0], 22, "bold"))
-        self._lbl_angle.grid(row=0, column=1, columnspan=2,
-                              padx=16, pady=12, sticky="w")
+                                    font=(cfg.FONT_BODY[0], 26, "bold"))
+        self._lbl_angle.grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
 
-        ttk.Separator(main, orient="horizontal").grid(
-            row=1, column=0, columnspan=3, sticky="ew", padx=8)
+        ttk.Separator(ctrl, orient="horizontal").grid(
+            row=2, column=0, sticky="ew", padx=12, pady=4)
 
-        # Grob-Schritte
-        ttk.Label(main, text="Grob (±10°):",
+        # Direkte Eingabe per Slider
+        ttk.Label(ctrl, text="Direkteingabe:",
                   style="Surface.TLabel").grid(
-            row=2, column=0, padx=16, pady=8, sticky="e")
-        ttk.Button(main, text="−10",
-                   command=lambda: self._step(-10)).grid(
-            row=2, column=1, padx=8, pady=8, sticky="ew")
-        ttk.Button(main, text="+10",
-                   command=lambda: self._step(10)).grid(
-            row=2, column=2, padx=8, pady=8, sticky="ew")
-
-        # Fein-Schritte
-        ttk.Label(main, text="Fein (±1°):",
-                  style="Surface.TLabel").grid(
-            row=3, column=0, padx=16, pady=8, sticky="e")
-        ttk.Button(main, text="−1",
-                   command=lambda: self._step(-1)).grid(
-            row=3, column=1, padx=8, pady=8, sticky="ew")
-        ttk.Button(main, text="+1",
-                   command=lambda: self._step(1)).grid(
-            row=3, column=2, padx=8, pady=8, sticky="ew")
-
-        # Slider
-        ttk.Label(main, text="Direkte Eingabe:",
-                  style="Surface.TLabel").grid(
-            row=4, column=0, padx=16, pady=8, sticky="e")
-        self._slider = ttk.Scale(main, from_=0, to=180,
+            row=3, column=0, padx=16, pady=(10, 2), sticky="w")
+        self._slider = ttk.Scale(ctrl, from_=0, to=180,
                                  orient="horizontal",
                                  variable=self._angle_var,
                                  command=self._on_slider)
-        self._slider.grid(row=4, column=1, columnspan=2,
-                          padx=8, pady=8, sticky="ew")
+        self._slider.grid(row=4, column=0, padx=16, pady=(0, 12), sticky="ew")
 
-        ttk.Separator(main, orient="horizontal").grid(
-            row=5, column=0, columnspan=3, sticky="ew", padx=8, pady=4)
+        ttk.Separator(ctrl, orient="horizontal").grid(
+            row=5, column=0, sticky="ew", padx=12, pady=4)
 
-        # Slot-Speicher-Buttons
-        ttk.Label(main,
-                  text="Position als Slot speichern:",
+        # Grob-Schritte
+        ttk.Label(ctrl, text="Grob  (±10°):",
                   style="Surface.TLabel").grid(
-            row=6, column=0, padx=16, pady=(8, 4), sticky="e")
+            row=6, column=0, padx=16, pady=(10, 2), sticky="w")
+        step_frm_coarse = ttk.Frame(ctrl, style="Surface.TFrame")
+        step_frm_coarse.grid(row=7, column=0, padx=16, pady=(0, 4), sticky="ew")
+        step_frm_coarse.columnconfigure((0, 1), weight=1)
+        ttk.Button(step_frm_coarse, text="−10",
+                   command=lambda: self._step(-10)).grid(
+            row=0, column=0, padx=(0, 4), sticky="ew")
+        ttk.Button(step_frm_coarse, text="+10",
+                   command=lambda: self._step(10)).grid(
+            row=0, column=1, padx=(4, 0), sticky="ew")
 
-        slot_frame = ttk.Frame(main, style="Surface.TFrame")
-        slot_frame.grid(row=6, column=1, columnspan=2,
-                        padx=8, pady=(8, 4), sticky="ew")
-        for i in range(1, 7):
-            slot_frame.columnconfigure(i - 1, weight=1)
-            ttk.Button(slot_frame, text=f"Slot {i}",
-                       command=lambda n=i: self._save_slot(n),
-                       style="Accent.TButton").grid(
-                row=0, column=i - 1, padx=3, sticky="ew")
-
-        ttk.Separator(main, orient="horizontal").grid(
-            row=7, column=0, columnspan=3, sticky="ew", padx=8, pady=4)
-
-        # Aktuelle Konfiguration anzeigen
-        ttk.Label(main, text="Gespeicherte Positionen:",
+        # Fein-Schritte
+        ttk.Label(ctrl, text="Fein  (±1°):",
                   style="Surface.TLabel").grid(
-            row=8, column=0, padx=16, pady=(8, 4), sticky="ne")
+            row=8, column=0, padx=16, pady=(8, 2), sticky="w")
+        step_frm_fine = ttk.Frame(ctrl, style="Surface.TFrame")
+        step_frm_fine.grid(row=9, column=0, padx=16, pady=(0, 10), sticky="ew")
+        step_frm_fine.columnconfigure((0, 1), weight=1)
+        ttk.Button(step_frm_fine, text="−1",
+                   command=lambda: self._step(-1)).grid(
+            row=0, column=0, padx=(0, 4), sticky="ew")
+        ttk.Button(step_frm_fine, text="+1",
+                   command=lambda: self._step(1)).grid(
+            row=0, column=1, padx=(4, 0), sticky="ew")
 
-        self._tree = ttk.Treeview(main, columns=("slot", "angle"),
-                                   show="headings", height=7)
-        self._tree.heading("slot", text="Slot")
-        self._tree.heading("angle", text="Winkel (°)")
-        self._tree.column("slot", width=80, anchor="center")
-        self._tree.column("angle", width=100, anchor="center")
-        self._tree.grid(row=8, column=1, columnspan=2,
-                        padx=8, pady=(8, 4), sticky="ew")
+        ttk.Separator(ctrl, orient="horizontal").grid(
+            row=10, column=0, sticky="ew", padx=12, pady=4)
 
-        # Auf Slot fahren
-        ttk.Button(main, text="→ Auf gespeicherten Slot fahren",
-                   command=self._goto_slot).grid(
-            row=9, column=1, columnspan=2, padx=8, pady=8, sticky="ew")
-
-        # Home
-        ttk.Button(main, text="🏠  Startposition (0°)",
+        # Home-Button
+        ttk.Button(ctrl, text="🏠  Startposition (0°)",
                    command=self._go_home,
                    style="TButton").grid(
-            row=10, column=0, columnspan=3, padx=16, pady=8)
+            row=11, column=0, padx=16, pady=(8, 16), sticky="ew")
+
+        # ── Rechte Spalte: Slots ──────────────────────────────────────────
+        slots_panel = ttk.Frame(outer, style="Surface.TFrame")
+        slots_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        slots_panel.columnconfigure(0, weight=1)
+
+        ttk.Label(slots_panel,
+                  text="Position als Slot speichern",
+                  style="Surface.TLabel",
+                  font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
+            row=0, column=0, padx=16, pady=(16, 8), sticky="w")
+
+        slot_grid = ttk.Frame(slots_panel, style="Surface.TFrame")
+        slot_grid.grid(row=1, column=0, padx=16, pady=(0, 8), sticky="ew")
+        for i in range(3):
+            slot_grid.columnconfigure(i, weight=1)
+        for i in range(1, 7):
+            r, c = divmod(i - 1, 3)
+            ttk.Button(slot_grid, text=f"Slot {i}",
+                       command=lambda n=i: self._save_slot(n),
+                       style="Accent.TButton").grid(
+                row=r, column=c, padx=4, pady=4, sticky="ew")
+
+        ttk.Separator(slots_panel, orient="horizontal").grid(
+            row=2, column=0, sticky="ew", padx=12, pady=4)
+
+        ttk.Label(slots_panel, text="Gespeicherte Positionen",
+                  style="Surface.TLabel",
+                  font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
+            row=3, column=0, padx=16, pady=(8, 4), sticky="w")
+
+        tree_frm = ttk.Frame(slots_panel, style="Surface.TFrame")
+        tree_frm.grid(row=4, column=0, padx=16, pady=(0, 8), sticky="nsew")
+        tree_frm.columnconfigure(0, weight=1)
+        slots_panel.rowconfigure(4, weight=1)
+
+        self._tree = ttk.Treeview(tree_frm, columns=("slot", "angle"),
+                                   show="headings", height=7)
+        self._tree.heading("slot",  text="Slot")
+        self._tree.heading("angle", text="Winkel (°)")
+        self._tree.column("slot",  width=80,  anchor="center")
+        self._tree.column("angle", width=110, anchor="center")
+        self._tree.grid(row=0, column=0, sticky="nsew")
+
+        sb = ttk.Scrollbar(tree_frm, orient="vertical",
+                           command=self._tree.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self._tree.configure(yscrollcommand=sb.set)
+
+        ttk.Button(slots_panel,
+                   text="→ Auf gespeicherten Slot fahren",
+                   command=self._goto_slot,
+                   style="TButton").grid(
+            row=5, column=0, padx=16, pady=(4, 16), sticky="ew")
 
         self._refresh_table()
 

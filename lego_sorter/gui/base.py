@@ -14,21 +14,25 @@ import config as cfg
 
 
 def apply_theme(root: tk.Tk):
-    """Wendet den dunklen LegoLAS-Theme auf ein tk.Tk-Fenster an."""
+    """Wendet den modernen LegoLAS-Theme auf ein tk.Tk-Fenster an."""
     style = ttk.Style(root)
     style.theme_use("clam")
 
+    # ── Basis ──────────────────────────────────────────────────────────────
     style.configure(".",
                     background=cfg.THEME_BG,
                     foreground=cfg.THEME_TEXT,
                     font=cfg.FONT_BODY,
                     borderwidth=0,
-                    relief="flat")
+                    relief="flat",
+                    focuscolor=cfg.THEME_ACCENT)
 
-    style.configure("TFrame",
-                    background=cfg.THEME_BG)
-    style.configure("Surface.TFrame",
-                    background=cfg.THEME_SURFACE)
+    # ── Frames ─────────────────────────────────────────────────────────────
+    style.configure("TFrame",       background=cfg.THEME_BG)
+    style.configure("Surface.TFrame",  background=cfg.THEME_SURFACE)
+    style.configure("Surface2.TFrame", background=cfg.THEME_SURFACE2)
+
+    # ── Labels ─────────────────────────────────────────────────────────────
     style.configure("TLabel",
                     background=cfg.THEME_BG,
                     foreground=cfg.THEME_TEXT,
@@ -41,92 +45,161 @@ def apply_theme(root: tk.Tk):
                     background=cfg.THEME_BG,
                     foreground=cfg.THEME_MUTED,
                     font=cfg.FONT_BODY)
+    style.configure("Small.TLabel",
+                    background=cfg.THEME_BG,
+                    foreground=cfg.THEME_MUTED,
+                    font=cfg.FONT_SMALL)
     style.configure("Surface.TLabel",
                     background=cfg.THEME_SURFACE,
                     foreground=cfg.THEME_TEXT,
                     font=cfg.FONT_BODY)
-    style.configure("TButton",
+    style.configure("Surface.Muted.TLabel",
                     background=cfg.THEME_SURFACE,
+                    foreground=cfg.THEME_MUTED,
+                    font=cfg.FONT_SMALL)
+
+    # ── Buttons (touch-freundlich: min. 44px Höhe durch padding) ───────────
+    style.configure("TButton",
+                    background=cfg.THEME_SURFACE2,
                     foreground=cfg.THEME_TEXT,
                     font=cfg.FONT_BODY,
-                    padding=(12, 6),
+                    padding=(14, 10),
                     relief="flat",
-                    borderwidth=1)
+                    borderwidth=0)
     style.map("TButton",
-              background=[("active", cfg.THEME_ACCENT),
-                          ("pressed", cfg.THEME_ACCENT)],
-              foreground=[("active", cfg.THEME_BG),
-                          ("pressed", cfg.THEME_BG)])
+              background=[("active",  cfg.THEME_ACCENT),
+                          ("pressed", cfg.THEME_ACCENT),
+                          ("disabled", cfg.THEME_SURFACE)],
+              foreground=[("active",  cfg.THEME_BG),
+                          ("pressed", cfg.THEME_BG),
+                          ("disabled", cfg.THEME_MUTED)])
+
     style.configure("Accent.TButton",
                     background=cfg.THEME_ACCENT,
                     foreground=cfg.THEME_BG,
                     font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"),
-                    padding=(12, 6))
+                    padding=(14, 10))
     style.map("Accent.TButton",
-              background=[("active", "#79c0ff"), ("pressed", "#79c0ff")])
+              background=[("active",  "#fbbf24"), ("pressed", "#d97706")])
+
     style.configure("Danger.TButton",
                     background=cfg.THEME_DANGER,
-                    foreground=cfg.THEME_BG,
+                    foreground=cfg.THEME_TEXT,
                     font=cfg.FONT_BODY,
-                    padding=(12, 6))
+                    padding=(14, 10))
     style.map("Danger.TButton",
-              background=[("active", "#ff7b72")])
+              background=[("active", "#dc2626")])
+
     style.configure("Success.TButton",
                     background=cfg.THEME_ACCENT2,
                     foreground=cfg.THEME_BG,
                     font=cfg.FONT_BODY,
-                    padding=(12, 6))
+                    padding=(14, 10))
     style.map("Success.TButton",
-              background=[("active", "#56d364")])
+              background=[("active", "#059669")])
+
+    # ── Notebook ───────────────────────────────────────────────────────────
     style.configure("TNotebook",
                     background=cfg.THEME_BG,
-                    tabmargins=[2, 5, 2, 0])
+                    borderwidth=0,
+                    tabmargins=[0, 4, 0, 0])
     style.configure("TNotebook.Tab",
                     background=cfg.THEME_SURFACE,
-                    foreground=cfg.THEME_TEXT,
-                    padding=[16, 6])
+                    foreground=cfg.THEME_MUTED,
+                    padding=[16, 8],
+                    borderwidth=0)
     style.map("TNotebook.Tab",
-              background=[("selected", cfg.THEME_ACCENT)],
-              foreground=[("selected", cfg.THEME_BG)])
+              background=[("selected", cfg.THEME_SURFACE2)],
+              foreground=[("selected", cfg.THEME_ACCENT)])
+
+    # ── Skala / Fortschritt ────────────────────────────────────────────────
     style.configure("TScale",
                     background=cfg.THEME_BG,
-                    troughcolor=cfg.THEME_SURFACE)
+                    troughcolor=cfg.THEME_SURFACE2,
+                    sliderlength=28,
+                    sliderrelief="flat")
     style.configure("TProgressbar",
                     background=cfg.THEME_ACCENT,
-                    troughcolor=cfg.THEME_SURFACE)
+                    troughcolor=cfg.THEME_SURFACE2,
+                    borderwidth=0,
+                    thickness=12)
+
+    # ── Treeview ───────────────────────────────────────────────────────────
     style.configure("Treeview",
                     background=cfg.THEME_SURFACE,
                     foreground=cfg.THEME_TEXT,
                     fieldbackground=cfg.THEME_SURFACE,
-                    rowheight=28)
+                    rowheight=30,
+                    borderwidth=0,
+                    relief="flat")
     style.configure("Treeview.Heading",
                     background=cfg.THEME_BG,
                     foreground=cfg.THEME_ACCENT,
-                    font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"))
+                    font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"),
+                    relief="flat",
+                    padding=(8, 6))
     style.map("Treeview",
               background=[("selected", cfg.THEME_ACCENT)],
               foreground=[("selected", cfg.THEME_BG)])
+
+    # ── Scrollbar ──────────────────────────────────────────────────────────
     style.configure("TScrollbar",
-                    background=cfg.THEME_SURFACE,
+                    background=cfg.THEME_SURFACE2,
                     troughcolor=cfg.THEME_BG,
-                    arrowcolor=cfg.THEME_MUTED)
+                    arrowcolor=cfg.THEME_MUTED,
+                    borderwidth=0,
+                    relief="flat",
+                    arrowsize=14)
+    style.map("TScrollbar",
+              background=[("active", cfg.THEME_ACCENT)])
+
+    # ── Eingaben ───────────────────────────────────────────────────────────
     style.configure("TCombobox",
-                    fieldbackground=cfg.THEME_SURFACE,
-                    background=cfg.THEME_SURFACE,
+                    fieldbackground=cfg.THEME_SURFACE2,
+                    background=cfg.THEME_SURFACE2,
                     foreground=cfg.THEME_TEXT,
-                    selectbackground=cfg.THEME_ACCENT)
+                    selectbackground=cfg.THEME_ACCENT,
+                    padding=(8, 6),
+                    borderwidth=1)
     style.configure("TEntry",
-                    fieldbackground=cfg.THEME_SURFACE,
+                    fieldbackground=cfg.THEME_SURFACE2,
                     foreground=cfg.THEME_TEXT,
-                    insertcolor=cfg.THEME_TEXT)
+                    insertcolor=cfg.THEME_TEXT,
+                    padding=(8, 6),
+                    borderwidth=1)
+
+    # ── Checkbutton / Radiobutton ──────────────────────────────────────────
     style.configure("TCheckbutton",
                     background=cfg.THEME_BG,
-                    foreground=cfg.THEME_TEXT)
+                    foreground=cfg.THEME_TEXT,
+                    focuscolor=cfg.THEME_ACCENT,
+                    indicatorcolor=cfg.THEME_SURFACE2)
+    style.map("TCheckbutton",
+              indicatorcolor=[("selected", cfg.THEME_ACCENT)])
+    style.configure("Surface.TCheckbutton",
+                    background=cfg.THEME_SURFACE,
+                    foreground=cfg.THEME_TEXT,
+                    focuscolor=cfg.THEME_ACCENT)
+    style.map("Surface.TCheckbutton",
+              indicatorcolor=[("selected", cfg.THEME_ACCENT)])
     style.configure("TRadiobutton",
                     background=cfg.THEME_BG,
-                    foreground=cfg.THEME_TEXT)
+                    foreground=cfg.THEME_TEXT,
+                    focuscolor=cfg.THEME_ACCENT,
+                    indicatorcolor=cfg.THEME_SURFACE2)
+    style.map("TRadiobutton",
+              indicatorcolor=[("selected", cfg.THEME_ACCENT)])
+    style.configure("Surface.TRadiobutton",
+                    background=cfg.THEME_SURFACE,
+                    foreground=cfg.THEME_TEXT,
+                    focuscolor=cfg.THEME_ACCENT)
+    style.map("Surface.TRadiobutton",
+              indicatorcolor=[("selected", cfg.THEME_ACCENT)])
+
+    # ── Separator ──────────────────────────────────────────────────────────
     style.configure("TSeparator",
                     background=cfg.THEME_BORDER)
+
     root.configure(bg=cfg.THEME_BG)
 
 

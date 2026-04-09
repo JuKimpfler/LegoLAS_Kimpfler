@@ -24,36 +24,40 @@ class DatabaseView(BaseView):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
-        ttk.Label(self, text="📊  Datenbank & Statistik",
-                  style="Title.TLabel").grid(
-            row=0, column=0, pady=(16, 8), sticky="n")
+        # Titelzeile + Aktionen-Buttons in einer Reihe
+        header = ttk.Frame(self, style="TFrame")
+        header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
+        header.columnconfigure(0, weight=1)
 
+        ttk.Label(header, text="📊  Datenbank & Statistik",
+                  style="Title.TLabel").grid(row=0, column=0, sticky="w")
+
+        btn_frm = ttk.Frame(header, style="TFrame")
+        btn_frm.grid(row=0, column=1, sticky="e")
+        ttk.Button(btn_frm, text="🔄  Aktualisieren",
+                   command=self.on_show,
+                   style="Accent.TButton").grid(row=0, column=0, padx=(4, 0))
+        ttk.Button(btn_frm, text="🗑  Inventar zurücksetzen",
+                   command=self._reset_inventory,
+                   style="Danger.TButton").grid(row=0, column=1, padx=(8, 0))
+
+        # Notebook
         nb = ttk.Notebook(self)
         nb.grid(row=1, column=0, sticky="nsew", padx=16, pady=8)
 
-        self._tab_stats    = ttk.Frame(nb)
-        self._tab_progress = ttk.Frame(nb)
+        self._tab_stats     = ttk.Frame(nb)
+        self._tab_progress  = ttk.Frame(nb)
         self._tab_inventory = ttk.Frame(nb)
-        self._tab_log      = ttk.Frame(nb)
-        nb.add(self._tab_stats,     text="Statistik")
-        nb.add(self._tab_progress,  text="Auftragsfortschritt")
-        nb.add(self._tab_inventory, text="Inventar")
-        nb.add(self._tab_log,       text="Scan-Log")
+        self._tab_log       = ttk.Frame(nb)
+        nb.add(self._tab_stats,     text="  Statistik  ")
+        nb.add(self._tab_progress,  text="  Auftragsfortschritt  ")
+        nb.add(self._tab_inventory, text="  Inventar  ")
+        nb.add(self._tab_log,       text="  Scan-Log  ")
 
         self._build_stats()
         self._build_progress()
         self._build_inventory()
         self._build_log()
-
-        # Unterhalb des Notebooks: Reset-Buttons
-        btn_frm = ttk.Frame(self, style="TFrame")
-        btn_frm.grid(row=2, column=0, pady=8)
-        ttk.Button(btn_frm, text="🗑  Inventar zurücksetzen",
-                   command=self._reset_inventory,
-                   style="Danger.TButton").grid(row=0, column=0, padx=8)
-        ttk.Button(btn_frm, text="🔄  Daten aktualisieren",
-                   command=self.on_show,
-                   style="Accent.TButton").grid(row=0, column=1, padx=8)
 
     # ------------------------------------------------------------------
     # Tab: Statistik
@@ -63,44 +67,44 @@ class DatabaseView(BaseView):
         frm = self._tab_stats
         frm.columnconfigure(0, weight=1)
 
-        summary_frm = ttk.Frame(frm, style="Surface.TFrame")
-        summary_frm.grid(row=0, column=0, padx=16, pady=16, sticky="ew")
-        summary_frm.columnconfigure((0, 1, 2), weight=1)
+        # Gesamt-Zähler – Hero-Karte
+        hero = ttk.Frame(frm, style="Surface.TFrame")
+        hero.grid(row=0, column=0, padx=16, pady=16, sticky="ew")
+        hero.columnconfigure(0, weight=1)
 
-        self._lbl_total = ttk.Label(summary_frm,
+        self._lbl_total = ttk.Label(hero,
                                     text="0",
                                     foreground=cfg.THEME_ACCENT,
                                     background=cfg.THEME_SURFACE,
-                                    font=(cfg.FONT_BODY[0], 28, "bold"))
-        self._lbl_total.grid(row=0, column=0, columnspan=3,
-                              pady=(16, 4))
-        ttk.Label(summary_frm, text="Teile gescannt gesamt",
+                                    font=(cfg.FONT_BODY[0], 36, "bold"))
+        self._lbl_total.grid(row=0, column=0, pady=(16, 2))
+        ttk.Label(hero, text="Teile gescannt (gesamt)",
                   style="Surface.TLabel",
                   font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
-            row=1, column=0, columnspan=3, pady=(0, 16))
+            row=1, column=0, pady=(0, 16))
 
-        # Behälter-Übersicht
-        ttk.Label(frm, text="Teile je Behälter:",
+        # Behälter-Balken
+        ttk.Label(frm, text="Teile je Behälter",
                   font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
-            row=1, column=0, padx=16, pady=(8, 4), sticky="w")
+            row=1, column=0, padx=16, pady=(0, 4), sticky="w")
 
         bar_frm = ttk.Frame(frm, style="Surface.TFrame")
         bar_frm.grid(row=2, column=0, padx=16, pady=4, sticky="ew")
         bar_frm.columnconfigure(1, weight=1)
 
-        self._stat_bars = {}
+        self._stat_bars   = {}
         self._stat_labels = {}
         for i in range(1, 7):
             ttk.Label(bar_frm, text=f"Behälter {i}:",
-                      style="Surface.TLabel").grid(
-                row=i - 1, column=0, padx=8, pady=4, sticky="w")
+                      style="Surface.Muted.TLabel").grid(
+                row=i - 1, column=0, padx=(10, 8), pady=5, sticky="w")
             bar_var = tk.IntVar(value=0)
             bar = ttk.Progressbar(bar_frm, variable=bar_var,
                                   maximum=100, length=200)
-            bar.grid(row=i - 1, column=1, padx=8, pady=4, sticky="ew")
+            bar.grid(row=i - 1, column=1, padx=4, pady=5, sticky="ew")
             lbl = ttk.Label(bar_frm, text="0",
-                            style="Surface.TLabel", width=6)
-            lbl.grid(row=i - 1, column=2, padx=4)
+                            style="Surface.TLabel", width=6, anchor="e")
+            lbl.grid(row=i - 1, column=2, padx=(4, 10))
             self._stat_bars[i]   = bar_var
             self._stat_labels[i] = lbl
 
@@ -112,39 +116,37 @@ class DatabaseView(BaseView):
         frm = self._tab_progress
         frm.columnconfigure(0, weight=1)
 
-        # Auftragsauswahl
         sel_frm = ttk.Frame(frm)
         sel_frm.grid(row=0, column=0, padx=16, pady=(16, 4), sticky="ew")
         sel_frm.columnconfigure(1, weight=1)
 
         ttk.Label(sel_frm, text="Auftrag:").grid(
-            row=0, column=0, padx=8, sticky="w")
+            row=0, column=0, padx=(0, 8), sticky="w")
         self._prog_order_var = tk.StringVar()
         self._prog_combo = ttk.Combobox(sel_frm,
                                          textvariable=self._prog_order_var,
                                          state="readonly")
-        self._prog_combo.grid(row=0, column=1, padx=8, sticky="ew")
+        self._prog_combo.grid(row=0, column=1, sticky="ew")
         self._prog_combo.bind("<<ComboboxSelected>>",
                               self._refresh_progress)
 
-        # Fortschrittsbalken je Behälter
         prog_frm = ttk.Frame(frm, style="Surface.TFrame")
         prog_frm.grid(row=1, column=0, padx=16, pady=8, sticky="ew")
         prog_frm.columnconfigure(2, weight=1)
 
-        self._prog_bars  = {}
-        self._prog_lbls  = {}
+        self._prog_bars = {}
+        self._prog_lbls = {}
         for i in range(1, 7):
             ttk.Label(prog_frm, text=f"Behälter {i}:",
-                      style="Surface.TLabel").grid(
-                row=i - 1, column=0, padx=8, pady=6, sticky="w")
+                      style="Surface.Muted.TLabel").grid(
+                row=i - 1, column=0, padx=(10, 8), pady=6, sticky="w")
             bar_var = tk.IntVar(value=0)
             bar = ttk.Progressbar(prog_frm, variable=bar_var,
                                   maximum=100, length=220)
-            bar.grid(row=i - 1, column=1, padx=8, pady=6, sticky="ew")
+            bar.grid(row=i - 1, column=1, padx=4, pady=6, sticky="ew")
             lbl = ttk.Label(prog_frm, text="0 / 0",
-                            style="Surface.TLabel", width=10)
-            lbl.grid(row=i - 1, column=2, padx=4)
+                            style="Surface.TLabel", width=10, anchor="e")
+            lbl.grid(row=i - 1, column=2, padx=(4, 10))
             self._prog_bars[i] = bar_var
             self._prog_lbls[i] = lbl
 

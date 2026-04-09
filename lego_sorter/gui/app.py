@@ -3,11 +3,13 @@ LegoLAS Hauptfenster (tkinter).
 
 Layout:
   ┌─────────────────────────────────────────────────────────┐
-  │  Toolbar: Tab-Buttons  [Sortieren|Kalibrierung|...]      │
+  │  Toolbar: Logo | Tab-Buttons         [STOP] [✕ Beenden] │
   ├─────────────────────────────────────────────────────────┤
   │                                                          │
   │            Aktive View (wechselnd)                       │
   │                                                          │
+  ├─────────────────────────────────────────────────────────┤
+  │  Statusleiste: Zustand  |  Version                       │
   └─────────────────────────────────────────────────────────┘
 
 Tastaturkürzel:
@@ -47,6 +49,14 @@ from .settings_view    import SettingsView
 from .database_view    import DatabaseView
 
 logger = logging.getLogger(__name__)
+
+# Tabs: key → (icon, Bezeichnung, Tastenkürzel)
+_TABS = [
+    ("sort",        "🔀", "Sortieren",     "F2"),
+    ("calibration", "⚙️", "Kalibrierung",  "F3"),
+    ("settings",    "🛠", "Einstellungen", "F4"),
+    ("database",    "📊", "Datenbank",     "F5"),
+]
 
 
 class LegoLASApp(tk.Tk):
@@ -100,6 +110,7 @@ class LegoLASApp(tk.Tk):
         # ------------------------------------------------------------------
         self._build_toolbar()
         self._build_views()
+        self._build_statusbar()
         self._register_keybindings()
 
         # Startview: Sortieren
@@ -114,54 +125,65 @@ class LegoLASApp(tk.Tk):
     # ------------------------------------------------------------------
 
     def _build_toolbar(self):
-        self._toolbar = tk.Frame(self, bg=cfg.THEME_SURFACE, height=50)
+        self._toolbar = tk.Frame(
+            self, bg=cfg.THEME_SURFACE,
+            height=cfg.TOOLBAR_HEIGHT)
         self._toolbar.pack(side="top", fill="x")
         self._toolbar.pack_propagate(False)
 
-        # Logo / Titel
-        tk.Label(self._toolbar,
-                 text="🧱 LegoLAS",
-                 bg=cfg.THEME_SURFACE,
-                 fg=cfg.THEME_ACCENT,
-                 font=(cfg.FONT_TITLE[0], 14, "bold")).pack(
-            side="left", padx=16)
+        # Vertikaler Trennstreifen unten (Akzentlinie)
+        tk.Frame(self, bg=cfg.THEME_ACCENT, height=2).pack(
+            side="top", fill="x")
 
-        # Tab-Buttons (rechts vom Logo)
+        # Logo / Titel
+        tk.Label(
+            self._toolbar,
+            text="🧱 LegoLAS",
+            bg=cfg.THEME_SURFACE,
+            fg=cfg.THEME_ACCENT,
+            font=(cfg.FONT_TITLE[0], 13, "bold"),
+        ).pack(side="left", padx=(16, 8))
+
+        # Dünne vertikale Trennlinie nach Logo
+        tk.Frame(self._toolbar, bg=cfg.THEME_BORDER,
+                 width=1).pack(side="left", fill="y", pady=8, padx=4)
+
+        # Tab-Buttons
         self._tab_buttons = {}
-        tabs = [
-            ("sort",        "🔀  Sortieren  [F2]"),
-            ("calibration", "⚙️  Kalibrierung  [F3]"),
-            ("settings",    "🛠  Einstellungen  [F4]"),
-            ("database",    "📊  Datenbank  [F5]"),
-        ]
-        for key, label in tabs:
+        for key, icon, label, shortcut in _TABS:
             btn = tk.Button(
                 self._toolbar,
-                text=label,
+                text=f"{icon}  {label}",
                 bg=cfg.THEME_SURFACE,
-                fg=cfg.THEME_TEXT,
-                activebackground=cfg.THEME_ACCENT,
-                activeforeground=cfg.THEME_BG,
+                fg=cfg.THEME_MUTED,
+                activebackground=cfg.THEME_SURFACE2,
+                activeforeground=cfg.THEME_TEXT,
                 relief="flat",
+                bd=0,
                 font=cfg.FONT_BODY,
-                padx=12, pady=8,
+                padx=14,
+                pady=0,
+                cursor="hand2",
                 command=lambda k=key: self._show_view(k),
             )
-            btn.pack(side="left", padx=2)
+            btn.pack(side="left", fill="y", padx=1)
             self._tab_buttons[key] = btn
 
-        # Notfall-Stop
+        # Notfall-Stop (rechts)
         tk.Button(
             self._toolbar,
             text="⏹  STOP",
             bg=cfg.THEME_DANGER,
-            fg=cfg.THEME_BG,
-            activebackground="#eba0ac",
+            fg=cfg.THEME_TEXT,
+            activebackground="#dc2626",
+            activeforeground=cfg.THEME_TEXT,
             relief="flat",
+            bd=0,
             font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"),
-            padx=12, pady=8,
+            padx=14,
+            cursor="hand2",
             command=self._emergency_stop,
-        ).pack(side="right", padx=16)
+        ).pack(side="right", padx=(4, 16), fill="y", pady=8)
 
         # Beenden
         tk.Button(
@@ -170,12 +192,14 @@ class LegoLASApp(tk.Tk):
             bg=cfg.THEME_SURFACE,
             fg=cfg.THEME_MUTED,
             activebackground=cfg.THEME_DANGER,
-            activeforeground=cfg.THEME_BG,
+            activeforeground=cfg.THEME_TEXT,
             relief="flat",
+            bd=0,
             font=cfg.FONT_BODY,
-            padx=12, pady=8,
+            padx=12,
+            cursor="hand2",
             command=self._on_close,
-        ).pack(side="right", padx=4)
+        ).pack(side="right", fill="y", pady=8, padx=2)
 
     # ------------------------------------------------------------------
     # Views
@@ -217,11 +241,44 @@ class LegoLASApp(tk.Tk):
         # Tab-Button hervorheben
         for k, btn in self._tab_buttons.items():
             if k == key:
-                btn.configure(bg=cfg.THEME_ACCENT,
-                              fg=cfg.THEME_BG)
+                btn.configure(
+                    bg=cfg.THEME_ACCENT,
+                    fg=cfg.THEME_BG,
+                    font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"))
             else:
-                btn.configure(bg=cfg.THEME_SURFACE,
-                              fg=cfg.THEME_TEXT)
+                btn.configure(
+                    bg=cfg.THEME_SURFACE,
+                    fg=cfg.THEME_MUTED,
+                    font=cfg.FONT_BODY)
+
+        # Statusleiste aktualisieren
+        tab_label = next(
+            (lbl for k, _, lbl, _ in _TABS if k == key), key)
+        self._statusbar_view_lbl.configure(text=f"  {tab_label}")
+
+    # ------------------------------------------------------------------
+    # Statusleiste
+    # ------------------------------------------------------------------
+
+    def _build_statusbar(self):
+        # Dünne Trennlinie oben
+        tk.Frame(self, bg=cfg.THEME_BORDER, height=1).pack(
+            side="bottom", fill="x")
+
+        bar = tk.Frame(self, bg=cfg.THEME_SURFACE, height=26)
+        bar.pack(side="bottom", fill="x")
+        bar.pack_propagate(False)
+
+        self._statusbar_view_lbl = tk.Label(
+            bar, text="", bg=cfg.THEME_SURFACE,
+            fg=cfg.THEME_MUTED, font=cfg.FONT_SMALL, anchor="w")
+        self._statusbar_view_lbl.pack(side="left")
+
+        tk.Label(
+            bar, text="LegoLAS  •  Raspberry Pi",
+            bg=cfg.THEME_SURFACE, fg=cfg.THEME_MUTED,
+            font=cfg.FONT_SMALL, anchor="e",
+        ).pack(side="right", padx=10)
 
     # ------------------------------------------------------------------
     # Tastaturkürzel

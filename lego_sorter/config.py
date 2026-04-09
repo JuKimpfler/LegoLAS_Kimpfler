@@ -81,17 +81,27 @@ EXPORTS_DIR      = os.path.join(DATA_DIR, "exports")
 # GUI
 # ---------------------------------------------------------------------------
 WINDOW_TITLE     = "LegoLAS – LEGO Sortiermaschine"
-THEME_BG         = "#0d1117"
-THEME_SURFACE    = "#161b22"
-THEME_ACCENT     = "#58a6ff"
-THEME_ACCENT2    = "#3fb950"
-THEME_DANGER     = "#f85149"
-THEME_TEXT       = "#e6edf3"
-THEME_MUTED      = "#6e7681"
-THEME_BORDER     = "#30363d"
+
+# Modern dark theme – Lego-inspired amber accent
+THEME_BG         = "#111827"   # Sehr dunkles Grau (Hintergrund)
+THEME_SURFACE    = "#1f2937"   # Karten-Hintergrund
+THEME_SURFACE2   = "#374151"   # Leicht hellere Fläche (Hover, Trenner)
+THEME_ACCENT     = "#f59e0b"   # Amber – Lego-Gelb
+THEME_ACCENT2    = "#10b981"   # Smaragd-Grün (Erfolg)
+THEME_DANGER     = "#ef4444"   # Rot (Fehler / Stop)
+THEME_WARNING    = "#f97316"   # Orange (Warnung)
+THEME_TEXT       = "#f9fafb"   # Fast-Weiß
+THEME_MUTED      = "#9ca3af"   # Gedämpftes Grau
+THEME_BORDER     = "#374151"   # Rahmen-Grau
+
 FONT_MONO        = ("Courier New", 10)
 FONT_BODY        = ("Helvetica", 11)
-FONT_TITLE       = ("Helvetica", 16, "bold")
+FONT_TITLE       = ("Helvetica", 15, "bold")
+FONT_SMALL       = ("Helvetica", 9)
+
+# Performance-Einstellungen für Raspberry Pi 3B
+SENSOR_POLL_MS   = 120   # Sensor-Abfrage-Intervall (ms) – unabhängig von Kamera
+TOOLBAR_HEIGHT   = 60    # Toolbar-Höhe in Pixel (touch-freundlich)
 
 # Tastatur-Bindings
 KEY_TOGGLE_BELT  = "b"
