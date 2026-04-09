@@ -2,7 +2,7 @@
 
 **LegoLAS** ist eine automatische LEGO-Sortiermaschine, die auf dem **Raspberry Pi 3** läuft. Ein Förderband transportiert LEGO-Teile an einer Kamera vorbei. Die [Brickognize-API](https://api.brickognize.com/docs) erkennt die Teile, und eine Servo-gesteuerte Weiche sortiert sie in bis zu 6 Behälter.
 
-Als Kamera wird ausschließlich ein **Android-Handy mit der DroidCam-App** per USB verwendet.
+Als Kamera wird ausschließlich ein **Android-Handy mit der DroidCam-App** per WLAN (lokales Netzwerk) verwendet.
 
 ---
 
@@ -26,7 +26,7 @@ Als Kamera wird ausschließlich ein **Android-Handy mit der DroidCam-App** per U
 
 - Raspberry Pi 3 mit Raspberry Pi OS (Bullseye oder neuer)
 - Android-Handy mit installierter [DroidCam-App](https://www.dev47apps.com/) (Play Store)
-- USB-Kabel (Handy ↔ Raspberry Pi)
+- Handy und Raspberry Pi im selben lokalen WLAN
 
 ### 2. Einmaliges Setup
 
@@ -35,27 +35,29 @@ cd ~/LegoLAS_Kimpfler/lego_sorter
 bash setup.sh
 ```
 
-Das Script installiert alle Systempakete (`adb`, `python3-tk`, `ffmpeg` usw.)
+Das Script installiert alle Systempakete (`python3-tk` usw.)
 und legt eine virtuelle Python-Umgebung mit allen Abhängigkeiten an.
 
 ### 3. DroidCam verbinden
 
-```bash
-# Am Handy: DroidCam-App öffnen → USB-Modus → START drücken
-# USB-Debugging am Handy erlauben (Popup bestätigen)
-
-# Verbindung prüfen
-adb devices              # Zeigt: "XXXXXXX   device"
-adb forward tcp:4747 tcp:4747
 ```
+# Am Handy: DroidCam-App öffnen → WLAN-Modus → START drücken
+# Die angezeigte IP-Adresse notieren (z. B. 192.168.1.100)
+```
+
+Anschließend die IP-Adresse in `config.py` eintragen:
+
+```python
+DROIDCAM_URL = "http://<Handy-IP>:4747/video"
+```
+
+Alternativ kann die URL auch im Einstellungs-Menü der GUI (F4) angepasst werden.
 
 ### 4. Anwendung starten
 
 ```bash
 ./start_gui.sh
 ```
-
-Das Script richtet die ADB Port-Weiterleitung automatisch ein und startet die GUI.
 
 ### 5. Entwicklung (ohne Vollbild)
 
