@@ -44,6 +44,7 @@ class CameraManager:
         self.cfg = config
         self._cap = None
         self._latest_frame: Optional[np.ndarray] = None
+        self._frame_counter: int = 0   # Wird bei jedem neuen Frame erhöht
         self._lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -112,6 +113,7 @@ class CameraManager:
             if ret and frame is not None:
                 with self._lock:
                     self._latest_frame = frame
+                    self._frame_counter += 1
             elapsed = time.time() - t0
             sleep_time = interval - elapsed
             if sleep_time > 0:
@@ -133,11 +135,18 @@ class CameraManager:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (140, 140, 140), 1)
             with self._lock:
                 self._latest_frame = frame
+                self._frame_counter += 1
             time.sleep(interval)
 
     # ------------------------------------------------------------------
     # Öffentliche API
     # ------------------------------------------------------------------
+
+    @property
+    def frame_counter(self) -> int:
+        """Zähler der bisher empfangenen Frames – nützlich für Change-Detection."""
+        with self._lock:
+            return self._frame_counter
 
     def get_frame(self) -> Optional[np.ndarray]:
         """Gibt den aktuellsten Frame als BGR-Array zurück."""
@@ -165,7 +174,8 @@ class CameraManager:
             rgb = frame
         img = Image.fromarray(rgb)
         if width and height:
-            img = img.resize((width, height), Image.LANCZOS)
+            # BILINEAR ist deutlich schneller als LANCZOS und für Live-Vorschau ausreichend
+            img = img.resize((width, height), Image.BILINEAR)
         return img
 
     def frame_to_jpeg_bytes(self, frame: np.ndarray,

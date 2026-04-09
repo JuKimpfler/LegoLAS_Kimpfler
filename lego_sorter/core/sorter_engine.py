@@ -171,12 +171,12 @@ class SorterEngine:
                 time.sleep(0.1)
                 continue
 
-            # 1. Auf Teil warten
+            # 1. Auf Teil warten (Lichtschranke HIGH = Teil erkannt)
             if not self.gpio.sensor_read():
-                time.sleep(0.01)
+                time.sleep(0.02)
                 continue
 
-            # 2. Teil erkannt → Band stoppen
+            # 2. Teil erkannt → Band sofort stoppen
             self._set_state(SorterState.STOPPING_BELT)
             self.gpio.belt_stop()
             time.sleep(self.cfg.BELT_STOP_DELAY)
@@ -195,17 +195,31 @@ class SorterEngine:
                 else:
                     container = self.FALLBACK_CONTAINER
 
-            # 4. Sortieren
+            # 4. Servo einstellen und warten bis er sicher angekommen ist
+            #    (servo_set_angle blockiert bereits für SERVO_MOVE_DELAY)
             self._set_state(SorterState.SORTING)
             self._reload_servo_positions()
             self.gpio.servo_to_position(container, self._servo_positions)
 
-            # 5. Band kurz weiter lassen bis Teil gefallen
+            # 5. Band wieder starten und warten bis das Teil
+            #    die Lichtschranke für SENSOR_CLEAR_TIMEOUT Sekunden freigegeben hat.
+            #    Dadurch wird ein doppeltes Zählen desselben Teils verhindert.
             self._set_state(SorterState.BELT_RESTART)
             self.gpio.belt_start(self._belt_speed)
-            time.sleep(1.5)
-            # Warte bis Sensor wieder frei
-            self.gpio.wait_for_clear(timeout=3.0)
+
+            t_clear_start = None
+            while self._running:
+                if self.gpio.sensor_read():
+                    # Teil noch in der Schranke → Freizähler zurücksetzen
+                    t_clear_start = None
+                else:
+                    # Schranke frei
+                    if t_clear_start is None:
+                        t_clear_start = time.time()
+                    elif time.time() - t_clear_start >= self.cfg.SENSOR_CLEAR_TIMEOUT:
+                        # Schranke war SENSOR_CLEAR_TIMEOUT Sekunden frei → ok
+                        break
+                time.sleep(0.1)
 
             # 6. Zurück zur Warteposition
             self._set_state(SorterState.WAITING_FOR_PART)

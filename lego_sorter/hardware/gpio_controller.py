@@ -191,7 +191,7 @@ class GPIOController:
         duty = self._angle_to_duty(angle)
         self._servo_pwm.ChangeDutyCycle(duty)
         self._servo_angle = angle
-        time.sleep(0.3)
+        time.sleep(self.cfg.SERVO_MOVE_DELAY)
         # PWM deaktivieren um Zittern zu vermeiden
         self._servo_pwm.ChangeDutyCycle(0)
         logger.debug("Servo → %d° (duty=%.2f)", angle, duty)

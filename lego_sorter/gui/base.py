@@ -50,7 +50,8 @@ def apply_theme(root: tk.Tk):
                     foreground=cfg.THEME_TEXT,
                     font=cfg.FONT_BODY,
                     padding=(12, 6),
-                    relief="flat")
+                    relief="flat",
+                    borderwidth=1)
     style.map("TButton",
               background=[("active", cfg.THEME_ACCENT),
                           ("pressed", cfg.THEME_ACCENT)],
@@ -62,19 +63,21 @@ def apply_theme(root: tk.Tk):
                     font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"),
                     padding=(12, 6))
     style.map("Accent.TButton",
-              background=[("active", "#74c7ec"), ("pressed", "#74c7ec")])
+              background=[("active", "#79c0ff"), ("pressed", "#79c0ff")])
     style.configure("Danger.TButton",
                     background=cfg.THEME_DANGER,
                     foreground=cfg.THEME_BG,
                     font=cfg.FONT_BODY,
                     padding=(12, 6))
     style.map("Danger.TButton",
-              background=[("active", "#eba0ac")])
+              background=[("active", "#ff7b72")])
     style.configure("Success.TButton",
                     background=cfg.THEME_ACCENT2,
                     foreground=cfg.THEME_BG,
                     font=cfg.FONT_BODY,
                     padding=(12, 6))
+    style.map("Success.TButton",
+              background=[("active", "#56d364")])
     style.configure("TNotebook",
                     background=cfg.THEME_BG,
                     tabmargins=[2, 5, 2, 0])
@@ -95,10 +98,10 @@ def apply_theme(root: tk.Tk):
                     background=cfg.THEME_SURFACE,
                     foreground=cfg.THEME_TEXT,
                     fieldbackground=cfg.THEME_SURFACE,
-                    rowheight=26)
+                    rowheight=28)
     style.configure("Treeview.Heading",
-                    background=cfg.THEME_MUTED,
-                    foreground=cfg.THEME_TEXT,
+                    background=cfg.THEME_BG,
+                    foreground=cfg.THEME_ACCENT,
                     font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"))
     style.map("Treeview",
               background=[("selected", cfg.THEME_ACCENT)],
@@ -106,7 +109,7 @@ def apply_theme(root: tk.Tk):
     style.configure("TScrollbar",
                     background=cfg.THEME_SURFACE,
                     troughcolor=cfg.THEME_BG,
-                    arrowcolor=cfg.THEME_TEXT)
+                    arrowcolor=cfg.THEME_MUTED)
     style.configure("TCombobox",
                     fieldbackground=cfg.THEME_SURFACE,
                     background=cfg.THEME_SURFACE,
@@ -123,7 +126,7 @@ def apply_theme(root: tk.Tk):
                     background=cfg.THEME_BG,
                     foreground=cfg.THEME_TEXT)
     style.configure("TSeparator",
-                    background=cfg.THEME_MUTED)
+                    background=cfg.THEME_BORDER)
     root.configure(bg=cfg.THEME_BG)
 
 

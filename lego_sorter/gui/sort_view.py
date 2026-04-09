@@ -34,6 +34,7 @@ except ImportError:
 class SortView(BaseView):
 
     def _build_ui(self):
+        self._last_frame_counter = -1  # Change-Detection für Kamera-Update
         self.columnconfigure(0, weight=3)
         self.columnconfigure(1, weight=2)
         self.rowconfigure(0, weight=1)
@@ -209,15 +210,19 @@ class SortView(BaseView):
             return
         cam = self.app.camera
         if cam and cam.is_open and _PIL:
-            w = self._cam_label.winfo_width() or 400
-            h = self._cam_label.winfo_height() or 300
-            if w < 10:
-                w, h = 400, 300
-            img = cam.get_pil_image(width=w, height=h)
-            if img:
-                photo = ImageTk.PhotoImage(img)
-                self._cam_label.configure(image=photo, text="")
-                self._cam_label.image = photo  # Referenz halten
+            current_counter = cam.frame_counter
+            if current_counter != self._last_frame_counter:
+                # Nur verarbeiten wenn tatsächlich ein neuer Frame vorliegt
+                self._last_frame_counter = current_counter
+                w = self._cam_label.winfo_width() or 400
+                h = self._cam_label.winfo_height() or 300
+                if w < 10:
+                    w, h = 400, 300
+                img = cam.get_pil_image(width=w, height=h)
+                if img:
+                    photo = ImageTk.PhotoImage(img)
+                    self._cam_label.configure(image=photo, text="")
+                    self._cam_label.image = photo  # Referenz halten
 
         # Sensor-Status aktualisieren
         gpio = self.app.gpio

@@ -37,23 +37,28 @@ DEFAULT_SERVO_POSITIONS = {
 # Position für "Warte-Stellung" (kein Behälter)
 SERVO_HOME_ANGLE = 0
 
+# Wartezeit nach Servo-Bewegung (Sekunden) – länger damit Servo sicher ankommt
+SERVO_MOVE_DELAY = 1.0
+
 # ---------------------------------------------------------------------------
 # Motor / Förderband
 # ---------------------------------------------------------------------------
 MOTOR_PWM_FREQ       = 100   # Hz
-DEFAULT_BELT_SPEED   = 60    # Prozent (0-100)
-BELT_STOP_DELAY      = 0.3   # Sekunden – Band hält kurz an vor dem Scan
+DEFAULT_BELT_SPEED   = 50    # Prozent (0-100)
+BELT_STOP_DELAY      = 0.5   # Sekunden – Band hält kurz an vor dem Scan
+
+# Sensor muss diese Zeit (Sekunden) frei sein, damit Teil als "durchgelaufen" gilt
+SENSOR_CLEAR_TIMEOUT = 1.0
 
 # ---------------------------------------------------------------------------
 # Kamera (DroidCam via lokalem Netzwerk – einzige unterstützte Kameraquelle)
 # ---------------------------------------------------------------------------
 # DroidCam läuft auf dem Android-Handy und streamt via WLAN im lokalen Netzwerk.
 # Die IP-Adresse des Handys in der DroidCam-App ablesen und hier eintragen.
-# Beispiel: "http://192.168.1.100:4747/video" – XXX durch die tatsächliche IP ersetzen.
-DROIDCAM_URL         = "http://192.168.1.XXX:4747/video"
+DROIDCAM_URL         = "http://192.168.178.61:4747/video"
 CAMERA_WIDTH         = 640
 CAMERA_HEIGHT        = 480
-LIVE_FPS             = 8     # FPS für Live-Vorschau in der GUI
+LIVE_FPS             = 5     # FPS für Live-Vorschau in der GUI (niedrig für bessere Performance)
 
 # ---------------------------------------------------------------------------
 # Brickognize API
@@ -76,13 +81,14 @@ EXPORTS_DIR      = os.path.join(DATA_DIR, "exports")
 # GUI
 # ---------------------------------------------------------------------------
 WINDOW_TITLE     = "LegoLAS – LEGO Sortiermaschine"
-THEME_BG         = "#1e1e2e"
-THEME_SURFACE    = "#313244"
-THEME_ACCENT     = "#89b4fa"
-THEME_ACCENT2    = "#a6e3a1"
-THEME_DANGER     = "#f38ba8"
-THEME_TEXT       = "#cdd6f4"
-THEME_MUTED      = "#585b70"
+THEME_BG         = "#0d1117"
+THEME_SURFACE    = "#161b22"
+THEME_ACCENT     = "#58a6ff"
+THEME_ACCENT2    = "#3fb950"
+THEME_DANGER     = "#f85149"
+THEME_TEXT       = "#e6edf3"
+THEME_MUTED      = "#6e7681"
+THEME_BORDER     = "#30363d"
 FONT_MONO        = ("Courier New", 10)
 FONT_BODY        = ("Helvetica", 11)
 FONT_TITLE       = ("Helvetica", 16, "bold")
