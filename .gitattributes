@@ -1,0 +1,5 @@
+# Enforce Unix (LF) line endings for all text files
+* text=auto
+
+# Shell scripts must always use LF to avoid CRLF errors on Linux/Raspberry Pi
+*.sh text eol=lf
