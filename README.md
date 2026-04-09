@@ -513,3 +513,57 @@ SICHERHEIT:
 ☐ Keine Quetschgefahr am Band
 ```
 
+---
+
+## 💻 Software – Schnellstart
+
+Die vollständige Steuerungssoftware befindet sich im Verzeichnis `lego_sorter/`.
+
+### Erstinstallation
+
+```bash
+cd ~/LegoLAS_Kimpfler/lego_sorter
+bash setup.sh
+```
+
+### GUI starten
+
+```bash
+./start_gui.sh
+```
+
+### GUI im Entwicklungsmodus (ohne Vollbild)
+
+```bash
+python3 main.py --no-fullscreen
+```
+
+### DroidCam-Kamera verwenden
+
+```bash
+python3 main.py --droidcam
+```
+
+### Autostart einrichten (Raspberry Pi Desktop)
+
+```bash
+mkdir -p ~/.config/autostart
+cp ~/LegoLAS_Kimpfler/lego_sorter/legolas.desktop ~/.config/autostart/
+```
+
+### Tastaturkürzel (Übersicht)
+
+| Taste     | Funktion                          |
+|-----------|-----------------------------------|
+| F2        | Sortier-Ansicht öffnen            |
+| F3        | Kalibrierungs-Ansicht öffnen      |
+| F4        | Einstellungs-Ansicht öffnen       |
+| F5        | Datenbank-Ansicht öffnen          |
+| B         | Förderband an/aus                 |
+| Leertaste | Manuell scannen                   |
+| A         | Automatik-Modus an/aus            |
+| 1–6       | Sortierweiche auf Behälter X stellen |
+| Escape    | Anwendung beenden                 |
+
+Weitere Details zur Software-Architektur: [Software.md](Software.md)
+

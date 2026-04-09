@@ -1,5 +1,158 @@
-zur lego teil wrkennung wird https://brickognize.com/ verwendet. bzw. die api dieser webseite. 
-https://api.brickognize.com/docs
+# LegoLAS – Software-Dokumentation
+
+## Übersicht
+
+Die Steuerungssoftware läuft vollständig auf dem **Raspberry Pi 3** und ist in Python 3 geschrieben. Sie übernimmt:
+
+- Hardwaresteuerung (Förderband, Servo-Weiche, IR-Lichtschranke)
+- Kameranbindung (DroidCam via USB oder direkte Webcam)
+- LEGO-Teilerkennung via [Brickognize-API](https://api.brickognize.com/docs)
+- Vollbild-GUI (tkinter, modernes dunkles Design)
+- Datenbankverwaltung (SQLite)
+- Auftrags- und Inventarverwaltung (Excel-basiert)
+- Automatischer Betrieb per Lichtschranke
+
+---
+
+## Projektstruktur
+
+```
+lego_sorter/
+├── main.py                    # Einstiegspunkt
+├── config.py                  # GPIO-Pins, Standardwerte, Pfade, Theme
+├── requirements.txt           # Python-Abhängigkeiten
+├── setup.sh                   # Einmaliges System-Setup
+├── start_gui.sh               # Anwendung starten (inkl. DroidCam-Verbindung)
+├── legolas.desktop            # Autostart-Eintrag für LXDE/Pixel Desktop
+│
+├── hardware/
+│   ├── gpio_controller.py     # RPi.GPIO-Abstraktion (Motor, Servo, Sensor)
+│   └── camera_manager.py      # Kameraverwaltung (DroidCam / OpenCV)
+│
+├── core/
+│   ├── brickognize.py         # Brickognize REST-API Client
+│   ├── database.py            # SQLite-Datenbank (Inventar, Log, Aufträge)
+│   ├── order_manager.py       # Excel-Import/Export für Auftragslisten
+│   └── sorter_engine.py       # Sortier-Zustandsmaschine (Auto/Manuell)
+│
+└── gui/
+    ├── base.py                # Theme, BaseView-Klasse
+    ├── app.py                 # Hauptfenster (LegoLASApp)
+    ├── sort_view.py           # Sortier-Menü (Live-Kamera, Steuerung)
+    ├── calibration_view.py    # Kalibrierungs-Menü (Servo-Positionen)
+    ├── settings_view.py       # Einstellungs-Menü (Speed, Threshold, Excel)
+    └── database_view.py       # Datenbank-Menü (Statistik, Inventar, Log)
+```
+
+---
+
+## Abhängigkeiten
+
+| Paket           | Zweck                                  | Installation              |
+|----------------|----------------------------------------|---------------------------|
+| `requests`      | Brickognize HTTP-API                   | `pip install requests`    |
+| `opencv-python` | Kamera-Capture                         | `pip install opencv-python` |
+| `Pillow`        | Frame → tkinter ImageTk                | `pip install Pillow`      |
+| `numpy`         | Frame-Datentypen                       | `pip install numpy`       |
+| `openpyxl`      | Excel-Import/Export                    | `pip install openpyxl`    |
+| `RPi.GPIO`      | GPIO (**nur Raspberry Pi**)            | `pip install RPi.GPIO`    |
+| `tkinter`       | GUI                                    | `sudo apt install python3-tk` |
+
+**Hinweis:** Auf Nicht-Raspberry-Pi-Systemen läuft die Anwendung mit einem Software-Mock für GPIO und Kamera – nützlich für Entwicklung und Tests.
+
+---
+
+## GUI-Module im Detail
+
+### Sortier-Menü
+
+Das Hauptmenü enthält:
+- **Live-Kameravorschau** (links) mit konfigurierbaren FPS
+- **Status-Panel** (Maschinenstand, letztes Teil, Zielbehälter, Sensor-Status)
+- **Betriebsart:** Manuell ↔ Automatik
+- **Modus:** Sortiermodus (Inventar aufbauen) ↔ Auftragsmodus (Excel-Liste abarbeiten)
+- **Auftragsliste:** Dropdown zur Auswahl des aktiven Auftrags
+- **Schnellauswahl Behälter 1–6** (Weiche manuell stellen)
+
+### Kalibrierungs-Menü
+
+- Grob/Fein-Schritte (+/– 10° und +/– 1°)
+- Direkteingabe via Slider (0°–180°)
+- Slot 1–6 speichern (aktuelle Position für Behälter sichern)
+- Tabelle aller gespeicherten Servo-Positionen
+
+### Einstellungs-Menü
+
+- Bandgeschwindigkeit (10–100%)
+- Erkennungsschwelle / Konfidenz-Threshold (10–100%)
+- Kamera-Modus und Index
+- Behälter-Beschriftungen
+- Excel-Auftragsliste importieren / Aufträge verwalten
+- Export: Inventar, Auftrag, fehlende Teile, Datenbank
+
+### Datenbank-Menü
+
+- Gesamtstatistik (Teile je Behälter)
+- Auftragsfortschritt (Fortschrittsbalken je Behälter)
+- Inventartabelle (Teilenummer, Name, Behälter, Anzahl)
+- Scan-Log (chronologisch mit Konfidenz)
+
+---
+
+## Sortier-Zustandsmaschine
+
+```
+IDLE → WAITING_FOR_PART → STOPPING_BELT → SCANNING → SORTING → BELT_RESTART → WAITING_FOR_PART
+```
+
+Nicht erkannte Teile (Score < Schwellwert) → automatisch Behälter 6.
+
+---
+
+## Auftragslisten (Excel)
+
+Spalten: **Teilenummer | Name | Anzahl | Behälter (1–6)**
+
+Prioritätsregel: Behälter 1 zuerst, Behälter 6 = Aussortierschublade.
+
+---
+
+## Tastaturkürzel
+
+| Taste     | Funktion                             |
+|-----------|--------------------------------------|
+| F2        | Sortier-Ansicht                      |
+| F3        | Kalibrierung                         |
+| F4        | Einstellungen                        |
+| F5        | Datenbank                            |
+| B         | Förderband an/aus                    |
+| Leertaste | Manuell scannen                      |
+| A         | Automatik-Modus an/aus               |
+| 1–6       | Weiche auf Behälter X                |
+| Escape    | Anwendung beenden                    |
+
+---
+
+## Schnellstart
+
+```bash
+# Einmaliges Setup
+cd ~/LegoLAS_Kimpfler/lego_sorter
+bash setup.sh
+
+# Starten
+./start_gui.sh
+
+# Entwicklung (ohne Vollbild)
+python3 main.py --no-fullscreen
+
+# Mit DroidCam
+python3 main.py --droidcam
+```
+
+---
+
+# Kamera-Setup: Android als USB-Webcam (DroidCam)
 
 # Option A: Android als USB-Webcam (DroidCam)
 
