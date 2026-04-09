@@ -24,22 +24,22 @@ class SettingsView(BaseView):
 
     def _build_ui(self):
         self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
 
-        ttk.Label(self, text="⚙️  Einstellungen",
+        ttk.Label(self, text="🛠  Einstellungen",
                   style="Title.TLabel").grid(
             row=0, column=0, pady=(16, 4), sticky="n")
 
         # Notebook mit Unter-Tabs
         nb = ttk.Notebook(self)
         nb.grid(row=1, column=0, sticky="nsew", padx=16, pady=8)
-        self.rowconfigure(1, weight=1)
 
         self._tab_general = ttk.Frame(nb)
         self._tab_orders  = ttk.Frame(nb)
         self._tab_export  = ttk.Frame(nb)
-        nb.add(self._tab_general, text="Allgemein")
-        nb.add(self._tab_orders,  text="Auftragslisten")
-        nb.add(self._tab_export,  text="Export")
+        nb.add(self._tab_general, text="  Allgemein  ")
+        nb.add(self._tab_orders,  text="  Auftragslisten  ")
+        nb.add(self._tab_export,  text="  Export  ")
 
         self._build_general()
         self._build_orders()
@@ -57,7 +57,7 @@ class SettingsView(BaseView):
 
         # Bandgeschwindigkeit
         ttk.Label(frm, text="Bandgeschwindigkeit:").grid(
-            row=row, column=0, padx=16, pady=12, sticky="w")
+            row=row, column=0, padx=16, pady=14, sticky="w")
         self._speed_var = tk.IntVar(value=cfg.DEFAULT_BELT_SPEED)
         frm_sp = ttk.Frame(frm)
         frm_sp.grid(row=row, column=1, sticky="ew", padx=16)
@@ -67,13 +67,14 @@ class SettingsView(BaseView):
                   command=self._on_speed_change).grid(
             row=0, column=0, sticky="ew")
         self._lbl_speed = ttk.Label(frm_sp,
-                                    text=f"{cfg.DEFAULT_BELT_SPEED}%")
+                                    text=f"{cfg.DEFAULT_BELT_SPEED}%",
+                                    width=5, anchor="e")
         self._lbl_speed.grid(row=0, column=1, padx=8)
         row += 1
 
         # Erkennungsschwelle
         ttk.Label(frm, text="Erkennungsschwelle:").grid(
-            row=row, column=0, padx=16, pady=12, sticky="w")
+            row=row, column=0, padx=16, pady=14, sticky="w")
         default_thresh = int(cfg.DEFAULT_CONF_THRESHOLD * 100)
         self._thresh_var = tk.IntVar(value=default_thresh)
         frm_th = ttk.Frame(frm)
@@ -83,7 +84,8 @@ class SettingsView(BaseView):
                   variable=self._thresh_var,
                   command=self._on_thresh_change).grid(
             row=0, column=0, sticky="ew")
-        self._lbl_thresh = ttk.Label(frm_th, text=f"{default_thresh}%")
+        self._lbl_thresh = ttk.Label(frm_th, text=f"{default_thresh}%",
+                                     width=5, anchor="e")
         self._lbl_thresh.grid(row=0, column=1, padx=8)
         row += 1
 
@@ -91,9 +93,9 @@ class SettingsView(BaseView):
             row=row, column=0, columnspan=2, sticky="ew", padx=16, pady=8)
         row += 1
 
-        # DroidCam URL (lokales Netzwerk)
+        # DroidCam URL
         ttk.Label(frm, text="DroidCam URL\n(lokale IP):").grid(
-            row=row, column=0, padx=16, pady=8, sticky="w")
+            row=row, column=0, padx=16, pady=10, sticky="w")
         self._droidcam_url_var = tk.StringVar(value=cfg.DROIDCAM_URL)
         ttk.Entry(frm, textvariable=self._droidcam_url_var, width=36).grid(
             row=row, column=1, padx=16, sticky="ew")
@@ -108,13 +110,14 @@ class SettingsView(BaseView):
             row=row, column=0, padx=16, pady=(8, 4), sticky="nw")
         label_frm = ttk.Frame(frm)
         label_frm.grid(row=row, column=1, padx=16, pady=(8, 4), sticky="ew")
+        label_frm.columnconfigure(1, weight=1)
         self._container_labels = {}
         for i in range(1, 7):
             ttk.Label(label_frm, text=f"Behälter {i}:").grid(
-                row=i - 1, column=0, padx=4, pady=2, sticky="w")
+                row=i - 1, column=0, padx=(0, 8), pady=3, sticky="w")
             var = tk.StringVar(value=f"Behälter {i}")
-            ttk.Entry(label_frm, textvariable=var, width=20).grid(
-                row=i - 1, column=1, padx=4, pady=2, sticky="ew")
+            ttk.Entry(label_frm, textvariable=var, width=22).grid(
+                row=i - 1, column=1, pady=3, sticky="ew")
             self._container_labels[i] = var
         row += 1
 
@@ -130,6 +133,7 @@ class SettingsView(BaseView):
     def _build_orders(self):
         frm = self._tab_orders
         frm.columnconfigure(0, weight=1)
+        frm.rowconfigure(4, weight=1)
 
         ttk.Label(frm,
                   text="Excel-Auftragsliste importieren\n"
@@ -151,8 +155,8 @@ class SettingsView(BaseView):
         # Tabelle
         tree_frm = ttk.Frame(frm)
         tree_frm.grid(row=4, column=0, padx=16, pady=4, sticky="nsew")
-        frm.rowconfigure(4, weight=1)
         tree_frm.columnconfigure(0, weight=1)
+        tree_frm.rowconfigure(0, weight=1)
 
         self._orders_tree = ttk.Treeview(tree_frm,
                                           columns=("id", "name", "created",
@@ -306,7 +310,6 @@ class SettingsView(BaseView):
             messagebox.showinfo("Hinweis", "Keine Aufträge vorhanden.",
                                 parent=self)
             return
-        # Neuesten Auftrag exportieren
         order = orders[0]
         items = db.get_order_items(order["id"])
         self._run_export(f"{order['name']}_auftrag.xlsx",
