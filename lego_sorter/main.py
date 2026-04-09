@@ -7,8 +7,12 @@ Starte mit:
 Optionen:
     --no-fullscreen    Fenster statt Vollbild (nützlich für Entwicklung)
     --mock-gpio        Erzwingt Mock-GPIO auch auf einem Pi
-    --droidcam         Verwendet DroidCam statt direkter Kamera
     --log-level LEVEL  Logging-Level (DEBUG, INFO, WARNING, ERROR)
+
+Kamera: DroidCam via USB (ADB Port-Forward auf tcp:4747).
+Vor dem Start sicherstellen, dass die DroidCam-App läuft und das
+Handy per USB verbunden ist. Das start_gui.sh-Script erledigt dies
+automatisch.
 """
 
 import argparse
@@ -25,8 +29,6 @@ def parse_args():
         description="LegoLAS – LEGO Sortiermaschine Steuerung")
     parser.add_argument("--no-fullscreen", action="store_true",
                         help="Startet im Fenstermodus statt Vollbild")
-    parser.add_argument("--droidcam", action="store_true",
-                        help="Verwendet DroidCam als Kameraquelle")
     parser.add_argument("--log-level",
                         default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -56,12 +58,6 @@ def main():
     if args.no_fullscreen:
         app.attributes("-fullscreen", False)
         app.geometry("1280x800")
-
-    if args.droidcam:
-        app.camera.stop()
-        import hardware.camera_manager as cm_mod
-        app.camera = cm_mod.CameraManager(cfg, use_droidcam=True)
-        app.camera.start()
 
     app.mainloop()
 

@@ -91,26 +91,12 @@ class SettingsView(BaseView):
             row=row, column=0, columnspan=2, sticky="ew", padx=16, pady=8)
         row += 1
 
-        # Kamera-Modus
-        ttk.Label(frm, text="Kamera-Modus:").grid(
+        # DroidCam URL
+        ttk.Label(frm, text="DroidCam URL:").grid(
             row=row, column=0, padx=16, pady=8, sticky="w")
-        self._cam_mode_var = tk.StringVar(value="direct")
-        cam_frm = ttk.Frame(frm)
-        cam_frm.grid(row=row, column=1, sticky="w", padx=16)
-        ttk.Radiobutton(cam_frm, text="Direkt (/dev/videoX)",
-                        variable=self._cam_mode_var, value="direct").grid(
-            row=0, column=0, padx=4)
-        ttk.Radiobutton(cam_frm, text="DroidCam (USB)",
-                        variable=self._cam_mode_var, value="droidcam").grid(
-            row=0, column=1, padx=4)
-        row += 1
-
-        # Kamera-Index
-        ttk.Label(frm, text="Kamera-Index:").grid(
-            row=row, column=0, padx=16, pady=8, sticky="w")
-        self._cam_index_var = tk.StringVar(value=str(cfg.CAMERA_INDEX))
-        ttk.Entry(frm, textvariable=self._cam_index_var, width=6).grid(
-            row=row, column=1, padx=16, sticky="w")
+        self._droidcam_url_var = tk.StringVar(value=cfg.DROIDCAM_URL)
+        ttk.Entry(frm, textvariable=self._droidcam_url_var, width=36).grid(
+            row=row, column=1, padx=16, sticky="ew")
         row += 1
 
         ttk.Separator(frm, orient="horizontal").grid(
@@ -240,8 +226,7 @@ class SettingsView(BaseView):
             return
         db.set_setting("belt_speed", self._speed_var.get())
         db.set_setting("conf_threshold", self._thresh_var.get() / 100.0)
-        db.set_setting("cam_mode", self._cam_mode_var.get())
-        db.set_setting("cam_index", self._cam_index_var.get())
+        db.set_setting("droidcam_url", self._droidcam_url_var.get())
         labels = {str(k): v.get() for k, v in self._container_labels.items()}
         db.set_setting("container_labels", labels)
         messagebox.showinfo("Gespeichert",
