@@ -71,7 +71,12 @@ DEFAULT_CONF_THRESHOLD = 0.7  # Mindest-Konfidenz für Identifikation
 # Pfade & Dateien
 # ---------------------------------------------------------------------------
 BASE_DIR         = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR         = os.path.join(BASE_DIR, "data")
+
+# Daten werden im Home-Verzeichnis des Benutzers gespeichert, damit die
+# Anwendung immer Schreib- und Leserechte hat (kein Permission-Denied-Fehler).
+DATA_DIR         = os.path.join(os.path.expanduser("~"), ".local", "share", "legolas")
+os.makedirs(DATA_DIR, exist_ok=True)
+
 DB_PATH          = os.path.join(DATA_DIR, "legolas.db")
 SETTINGS_PATH    = os.path.join(DATA_DIR, "settings.json")
 ORDERS_DIR       = os.path.join(DATA_DIR, "orders")
