@@ -91,8 +91,8 @@ class SettingsView(BaseView):
             row=row, column=0, columnspan=2, sticky="ew", padx=16, pady=8)
         row += 1
 
-        # DroidCam URL
-        ttk.Label(frm, text="DroidCam URL:").grid(
+        # DroidCam URL (lokales Netzwerk)
+        ttk.Label(frm, text="DroidCam URL\n(lokale IP):").grid(
             row=row, column=0, padx=16, pady=8, sticky="w")
         self._droidcam_url_var = tk.StringVar(value=cfg.DROIDCAM_URL)
         ttk.Entry(frm, textvariable=self._droidcam_url_var, width=36).grid(

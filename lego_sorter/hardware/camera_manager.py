@@ -1,6 +1,6 @@
 """
 Kamera-Manager für LegoLAS.
-Verwendet DroidCam via HTTP-Stream (USB-Modus mit ADB Port-Forward).
+Verwendet DroidCam via HTTP-Stream (WLAN-Modus, lokales Netzwerk).
 
 Liefert Frames als numpy-Array (BGR) bzw. als PIL-Image für tkinter.
 """
@@ -32,7 +32,7 @@ except ImportError:
 class CameraManager:
     """
     Thread-sichere Kamera-Verwaltung mit kontinuierlichem Capture-Loop.
-    Verwendet ausschließlich DroidCam via HTTP-Stream (USB/ADB).
+    Verwendet ausschließlich DroidCam via HTTP-Stream (WLAN, lokales Netzwerk).
 
     Parameter
     ---------
@@ -71,8 +71,8 @@ class CameraManager:
                 "DroidCam-Stream konnte nicht geöffnet werden (%s). "
                 "Bitte sicherstellen, dass: "
                 "1) DroidCam-App auf dem Handy läuft, "
-                "2) USB-Kabel verbunden ist, "
-                "3) 'adb forward tcp:4747 tcp:4747' ausgeführt wurde.",
+                "2) Handy und Raspberry Pi im selben WLAN sind, "
+                "3) die korrekte IP-Adresse in config.py eingetragen ist.",
                 self.cfg.DROIDCAM_URL,
             )
             self._cap = None
@@ -129,7 +129,7 @@ class CameraManager:
             if _CV2_AVAILABLE:
                 cv2.putText(frame, "DroidCam nicht verbunden", (40, 220),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (180, 180, 180), 2)
-                cv2.putText(frame, "adb forward tcp:4747 tcp:4747", (40, 260),
+                cv2.putText(frame, "IP-Adresse in config.py prüfen", (40, 260),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (140, 140, 140), 1)
             with self._lock:
                 self._latest_frame = frame

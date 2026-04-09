@@ -338,7 +338,6 @@ EINFACHE VERSION (ohne echtes Band):
 | Lichtschranke | IR, 5V, digital | 1 | 3€ |
 | Weißes Acrylglas | 10x10cm, 3mm | 1 | 3€ |
 | Holz/3D-Druck | Handy-Halter | 1 | 5€ |
-| USB-Kabel | Handy-Verbindung | 1 | 3€ |
 
 ---
 
@@ -667,7 +666,7 @@ OPTION C: 3D-Druck Verbinder + Holzstäbe
 | **Lichtschranke** | IR Sensor digital | 1 | 3€ |
 | **LED-Streifen** | 12V warmweiß 30cm | 2 | 5€ |
 | **Netzteil** | 12V 3A | 1 | 8€ |
-| **USB-Kabel** | Handy + Arduino | 2 | 5€ |
+| **USB-Kabel** | Arduino | 1 | 3€ |
 | **Jumper-Kabel** | Set | 1 | 3€ |
 | | | **Summe Elektronik:** | **~33€** |
 
@@ -727,11 +726,11 @@ OPTION C: 3D-Druck Verbinder + Holzstäbe
     │         ┌───┘    │                                     │   │
     │         │        │  GPIO 2 ─── SDA                     │   │
     │         ▼        │  GPIO 3 ─── SCL                     │   │
-    │    ┌────────┐    │  USB ────── Android Handy           │   │
+    │    ┌────────┐    │  WLAN ───── Android Handy           │   │
     │    │Förder- │    │                                     │   │
     │    │ band   │    └─────────────────────────────────────┘   │
     │    │ Motor  │                     │                        │
-    │    └────────┘                     │ USB                    │
+    │    └────────┘                     │ WLAN                   │
     │                                   ▼                        │
     │                           ┌─────────────┐                  │
     │    ┌────────┐             │   Android   │                  │

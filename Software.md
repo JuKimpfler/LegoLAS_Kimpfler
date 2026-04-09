@@ -5,7 +5,7 @@
 Die Steuerungssoftware läuft vollständig auf dem **Raspberry Pi 3** und ist in Python 3 geschrieben. Sie übernimmt:
 
 - Hardwaresteuerung (Förderband, Servo-Weiche, IR-Lichtschranke)
-- Kameraanbindung via **DroidCam** (Android-Handy als USB-Webcam)
+- Kameraanbindung via **DroidCam** (Android-Handy als WLAN-Kamera)
 - LEGO-Teilerkennung via [Brickognize-API](https://api.brickognize.com/docs)
 - Vollbild-GUI (tkinter, modernes dunkles Design)
 - Datenbankverwaltung (SQLite)
@@ -57,32 +57,31 @@ lego_sorter/
 | `openpyxl`      | Excel-Import/Export               | `pip install openpyxl`      |
 | `RPi.GPIO`      | GPIO (**nur Raspberry Pi**)       | `pip install RPi.GPIO`      |
 | `tkinter`       | GUI                               | `sudo apt install python3-tk` |
-| `adb`           | DroidCam USB-Verbindung           | `sudo apt install adb`      |
 
 **Hinweis:** Auf Nicht-Raspberry-Pi-Systemen läuft die Anwendung mit einem Software-Mock für GPIO – nützlich für Entwicklung und Tests. Ohne DroidCam-Verbindung wird ein Platzhalter-Bild angezeigt.
 
 ---
 
-## Kamera-Setup: DroidCam via USB
+## Kamera-Setup: DroidCam via WLAN
 
 ### Funktionsprinzip
 
-Das Android-Handy streamt sein Kamerabild per USB an den Raspberry Pi.
-OpenCV liest den Stream direkt als HTTP-URL (`http://localhost:4747/video`).
+Das Android-Handy streamt sein Kamerabild über das lokale WLAN an den Raspberry Pi.
+OpenCV liest den Stream direkt als HTTP-URL (`http://<Handy-IP>:4747/video`).
+Ein USB-Kabel oder ADB wird **nicht** benötigt.
 
 ```
-┌──────────────┐     USB      ┌──────────────────────────────┐
-│   Android    │◄────────────▶│      Raspberry Pi            │
-│  + DroidCam  │              │  adb forward tcp:4747 tcp:4747│
-│              │              │  OpenCV → http://localhost:4747/video │
-└──────────────┘              └──────────────────────────────┘
+┌──────────────┐    WLAN     ┌──────────────────────────────┐
+│   Android    │◄───────────▶│      Raspberry Pi            │
+│  + DroidCam  │             │  OpenCV → http://<IP>:4747/video │
+└──────────────┘             └──────────────────────────────┘
 ```
 
 ### Vorteile
 - ✅ Keine zusätzliche Kamera-Hardware nötig
-- ✅ Stabile USB-Verbindung (~50 ms Latenz)
-- ✅ Kein WLAN erforderlich
-- ✅ Handy wird gleichzeitig aufgeladen
+- ✅ Kein USB-Kabel erforderlich
+- ✅ Handy kann frei positioniert werden
+- ✅ Einfaches Setup über lokales Netzwerk
 
 ### Schritt 1: DroidCam-App installieren
 
@@ -92,34 +91,31 @@ Entwickler: Dev47Apps
 Mindestversion: Android 5.0
 ```
 
-### Schritt 2: USB-Debugging aktivieren
+### Schritt 2: Verbindung herstellen
 
 ```
-Einstellungen → Info über das Telefon → 7× auf „Build-Nummer" tippen
-→ Entwickleroptionen → USB-Debugging aktivieren
+# Handy und Raspberry Pi in dasselbe WLAN einbuchen
+# DroidCam-App öffnen → WLAN-Modus → START drücken
+# Die angezeigte IP-Adresse (z. B. 192.168.1.100) notieren
 ```
 
-### Schritt 3: Verbindung herstellen
+### Schritt 3: IP-Adresse konfigurieren
 
-```bash
-# Handy per USB anschließen und Popup am Handy bestätigen
-adb devices                     # Sollte "XXXXXXX   device" zeigen
-adb forward tcp:4747 tcp:4747   # Port-Weiterleitung einrichten
-
-# DroidCam-App öffnen → USB-Modus → START drücken
+```python
+# In config.py die IP-Adresse des Handys eintragen:
+DROIDCAM_URL  = "http://<Handy-IP>:4747/video"
 ```
 
-### Schritt 4: Verbindung testen
+Alternativ kann die URL im Einstellungs-Menü der GUI (F4) angepasst werden.
 
-```bash
-# Stream testen (optional)
-ffplay http://localhost:4747/video
-```
+### Schritt 4: Verbindung testen (optional)
+
+Den Stream im Browser öffnen: `http://<Handy-IP>:4747/video`
 
 ### Konfiguration in config.py
 
 ```python
-DROIDCAM_URL  = "http://localhost:4747/video"   # Standard-Port
+DROIDCAM_URL  = "http://<Handy-IP>:4747/video"   # Handy-IP eintragen
 CAMERA_WIDTH  = 640
 CAMERA_HEIGHT = 480
 LIVE_FPS      = 8
@@ -152,7 +148,7 @@ Das Hauptmenü enthält:
 
 - Bandgeschwindigkeit (10–100%)
 - Erkennungsschwelle / Konfidenz-Threshold (10–100%)
-- DroidCam-URL (Standard: `http://localhost:4747/video`)
+- DroidCam-URL (Standard: `http://192.168.1.100:4747/video`)
 - Behälter-Beschriftungen
 - Excel-Auftragsliste importieren / Aufträge verwalten
 - Export: Inventar, Auftrag, fehlende Teile, Datenbank
@@ -207,8 +203,8 @@ Prioritätsregel: Behälter 1 zuerst, Behälter 6 = Aussortierschublade.
 cd ~/LegoLAS_Kimpfler/lego_sorter
 bash setup.sh
 
-# DroidCam verbinden (Handy per USB + App starten)
-adb forward tcp:4747 tcp:4747
+# DroidCam-App auf dem Handy starten (WLAN-Modus)
+# IP-Adresse in config.py eintragen
 
 # Starten
 ./start_gui.sh
@@ -223,9 +219,8 @@ python3 main.py --no-fullscreen
 
 | Problem                          | Lösung                                             |
 |----------------------------------|----------------------------------------------------|
-| Kamera zeigt „DroidCam nicht verbunden" | `adb forward tcp:4747 tcp:4747` ausführen  |
-| `adb devices` zeigt kein Gerät   | USB-Debugging am Handy aktivieren, Popup bestätigen |
-| DroidCam App zeigt „Waiting"     | App neu starten, dann `adb forward` erneut ausführen |
+| Kamera zeigt „DroidCam nicht verbunden" | IP-Adresse in config.py oder den Einstellungen prüfen |
+| Falsches Bild / kein Stream      | DroidCam-App neu starten, dann URL erneut testen   |
+| Handy und Pi nicht erreichbar    | Beide Geräte ins selbe WLAN einbuchen              |
 | Unscharfe Bilder                 | In DroidCam-App Autofokus aktivieren               |
-| Langsame Verbindung              | USB 2.0 Anschluss am Raspberry Pi verwenden        |
-| `adb` nicht gefunden             | `sudo apt install adb` ausführen                   |
+| Langsame Verbindung              | WLAN-Signal verbessern oder Handy näher an Router  |

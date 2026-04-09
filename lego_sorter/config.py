@@ -45,10 +45,12 @@ DEFAULT_BELT_SPEED   = 60    # Prozent (0-100)
 BELT_STOP_DELAY      = 0.3   # Sekunden – Band hält kurz an vor dem Scan
 
 # ---------------------------------------------------------------------------
-# Kamera (DroidCam via USB – einzige unterstützte Kameraquelle)
+# Kamera (DroidCam via lokalem Netzwerk – einzige unterstützte Kameraquelle)
 # ---------------------------------------------------------------------------
-# DroidCam läuft auf dem Android-Handy und streamt via USB (ADB Port-Forward)
-DROIDCAM_URL         = "http://localhost:4747/video"
+# DroidCam läuft auf dem Android-Handy und streamt via WLAN im lokalen Netzwerk.
+# Die IP-Adresse des Handys in der DroidCam-App ablesen und hier eintragen.
+# Beispiel: "http://192.168.1.100:4747/video" – XXX durch die tatsächliche IP ersetzen.
+DROIDCAM_URL         = "http://192.168.1.XXX:4747/video"
 CAMERA_WIDTH         = 640
 CAMERA_HEIGHT        = 480
 LIVE_FPS             = 8     # FPS für Live-Vorschau in der GUI

@@ -18,29 +18,7 @@ sudo apt install -y \
     python3-full \
     python3-pip \
     python3-venv \
-    python3-tk \
-    adb \
-    v4l2loopback-dkms \
-    v4l2loopback-utils \
-    v4l-utils \
-    ffmpeg
-
-# --- v4l2loopback für DroidCam vorbereiten ---
-if ! lsmod | grep -q v4l2loopback; then
-    sudo modprobe v4l2loopback devices=1 video_nr=10 \
-        card_label="DroidCam" exclusive_caps=1
-fi
-
-# Beim Booten automatisch laden
-if ! grep -q v4l2loopback /etc/modules; then
-    echo "v4l2loopback" | sudo tee -a /etc/modules
-fi
-
-CONF=/etc/modprobe.d/v4l2loopback.conf
-if [ ! -f "$CONF" ]; then
-    echo 'options v4l2loopback devices=1 video_nr=10 card_label="DroidCam" exclusive_caps=1' \
-        | sudo tee "$CONF"
-fi
+    python3-tk
 
 # --- Virtuelle Python-Umgebung ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
