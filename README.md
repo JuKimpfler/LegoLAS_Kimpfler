@@ -83,7 +83,25 @@ Detaillierte Verkabelungspläne → [Hardware.md](Hardware.md)
 
 ---
 
-## ⌨️ Tastaturkürzel
+## ⚡ Performance auf Raspberry Pi 3
+
+Die Anwendung ist für den Raspberry Pi 3 optimiert:
+
+- **Kamera-Preview standardmäßig deaktiviert**: Statt eines Live-Bildes wird in der GUI nur ein leichter Status-Text angezeigt (Kamera online/offline, Frame-Zähler, Lag-Warnung). Das spart erheblich CPU und verhindert GUI-Ruckeln.
+- **Stream-Lag minimiert**: Der Kamera-Capture-Thread liest Frames so schnell wie möglich und hält den internen OpenCV-Puffer leer, sodass beim Scannen immer ein aktueller Frame vorliegt (kein 10-Sekunden-Lag mehr).
+- **Non-Blocking GUI**: Manueller Scan und automatischer Sortierbetrieb laufen in eigenen Threads – der Tkinter-Main-Thread bleibt immer reaktionsfähig.
+
+### Kamera-Preview aktivieren
+
+Falls ein Live-Kamerabild gewünscht wird (z. B. auf stärkerer Hardware), kann die Preview in `lego_sorter/config.py` aktiviert werden:
+
+```python
+GUI_SHOW_CAMERA_PREVIEW = True   # Standard: False
+```
+
+---
+
+
 
 | Taste     | Funktion                      |
 |-----------|-------------------------------|
