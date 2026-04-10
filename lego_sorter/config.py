@@ -58,7 +58,16 @@ SENSOR_CLEAR_TIMEOUT = 1.0
 DROIDCAM_URL         = "http://192.168.178.61:4747/video"
 CAMERA_WIDTH         = 640
 CAMERA_HEIGHT        = 480
-LIVE_FPS             = 5     # FPS für Live-Vorschau in der GUI (niedrig für bessere Performance)
+LIVE_FPS             = 5     # FPS für Live-Vorschau in der GUI (nur relevant wenn Preview aktiv)
+
+# Kamera-Vorschau in der GUI (standardmäßig deaktiviert für bessere Performance auf Raspberry Pi 3).
+# False = nur leichter Kamera-Status-Text (online/offline, Frame-Zähler, Lag-Erkennung).
+# True  = volles Kamerabild (PIL resize + ImageTk.PhotoImage) – CPU-intensiv.
+GUI_SHOW_CAMERA_PREVIEW = False
+
+# Update-Frequenz für den Kamera-Status-Text in der GUI (Hz).
+# Unabhängig von LIVE_FPS; niedrige Werte (1–2) reichen völlig aus.
+GUI_STATUS_FPS       = 1
 
 # ---------------------------------------------------------------------------
 # Brickognize API
