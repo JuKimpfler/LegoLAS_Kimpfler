@@ -88,7 +88,7 @@ class OrderManager:
             color_name = ""
             if len(row) > 4 and row[4] is not None:
                 raw_color = str(row[4]).strip()
-                if raw_color and raw_color.lower() not in {"", "-", "n/a", "none", "keine"}:
+                if raw_color and raw_color.lower() not in {"-", "n/a", "none", "keine"}:
                     color_name = raw_color
             items.append((part_num, color_name, container, required))
 

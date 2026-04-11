@@ -305,8 +305,8 @@ class SorterEngine:
         inventory = self.db.get_inventory()
         for entry in inventory:
             if entry["part_num"] == part_num:
-                if (not entry.get("color_name", "") or
-                        entry.get("color_name", "") == color_name):
+                entry_color = entry.get("color_name", "")
+                if not entry_color or entry_color == color_name:
                     return entry["container"]
         return 1  # Neues Teil → Behälter 1
 

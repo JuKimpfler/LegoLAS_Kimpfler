@@ -382,10 +382,9 @@ class SortView(BaseView):
             self._lbl_container.configure(
                 text=f"Behälter {result['container']}")
         else:
-            engine = self.app.engine
             self._lbl_part.configure(text="Nicht erkannt")
             self._lbl_container.configure(
-                text=f"Behälter {engine.FALLBACK_CONTAINER}")
+                text=f"Behälter {self.app.engine.FALLBACK_CONTAINER}")
 
     def _set_container(self, n: int):
         gpio = self.app.gpio
