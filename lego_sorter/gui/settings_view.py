@@ -152,10 +152,10 @@ class SettingsView(BaseView):
                   justify="left").grid(
             row=0, column=0, padx=16, pady=(16, 4), sticky="w")
 
-        ttk.Button(frm, text="📂  Excel importieren",
-                   command=self._import_order,
-                   style="Accent.TButton").grid(
-            row=1, column=0, padx=16, pady=8, sticky="w")
+        self._import_btn = ttk.Button(frm, text="📂  Excel importieren",
+                                      command=self._import_order,
+                                      style="Accent.TButton")
+        self._import_btn.grid(row=1, column=0, padx=16, pady=8, sticky="w")
 
         ttk.Separator(frm, orient="horizontal").grid(
             row=2, column=0, sticky="ew", padx=16, pady=8)
@@ -305,18 +305,36 @@ class SettingsView(BaseView):
         db = self.app.db
         if not om or not db:
             return
-        try:
-            name, items = om.import_order(path)
-            order_id = db.create_order(name, items)
+
+        self._import_btn.configure(state="disabled",
+                                   text="⏳  Importiere…")
+
+        def _run():
+            try:
+                name, items = om.import_order(path)
+                order_id = db.create_order(name, items)
+                self.after(0, lambda n=name, c=len(items), i=order_id:
+                           _done(n, c, i))
+            except Exception as exc:
+                self.after(0, lambda msg=str(exc): _error(msg))
+
+        def _done(name, count, order_id):
+            self._import_btn.configure(state="normal",
+                                       text="📂  Excel importieren")
             messagebox.showinfo(
                 "Importiert",
-                f"Auftrag '{name}' mit {len(items)} Positionen importiert "
+                f"Auftrag '{name}' mit {count} Positionen importiert "
                 f"(ID={order_id}).",
                 parent=self,
             )
             self._refresh_orders()
-        except Exception as exc:
-            messagebox.showerror("Fehler", str(exc), parent=self)
+
+        def _error(msg):
+            self._import_btn.configure(state="normal",
+                                       text="📂  Excel importieren")
+            messagebox.showerror("Fehler", msg, parent=self)
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _import_from_rebrickable(self):
         set_id = self._rb_set_id_var.get().strip()
@@ -347,7 +365,6 @@ class SettingsView(BaseView):
 
         self._rb_import_btn.configure(state="disabled")
         self._rb_status_lbl.configure(text="⏳ Lade Daten von Rebrickable…")
-        self.update_idletasks()
 
         def _run():
             try:

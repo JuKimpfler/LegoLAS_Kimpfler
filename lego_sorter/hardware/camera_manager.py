@@ -109,10 +109,15 @@ class CameraManager:
     # ------------------------------------------------------------------
 
     def _capture_loop(self):
-        # Kein Sleep – so schnell wie möglich lesen, um den internen
+        # Frames so schnell wie möglich lesen, um den internen
         # OpenCV/FFMPEG-Puffer leer zu halten und stets den neuesten Frame
         # zu erhalten. Dadurch wird der typische 10-Sekunden-Lag bei
         # DroidCam-over-HTTP (MJPEG) eliminiert.
+        # Nach jedem erfolgreichen Lesevorgang kurz schlafen, damit der GIL
+        # für andere Threads (insbesondere den tkinter-Main-Thread) freigegeben
+        # wird. DroidCam liefert maximal ~30 fps; 5 ms Pause haben keinen
+        # Einfluss auf die Frame-Frische, reduzieren aber den CPU-Verbrauch
+        # erheblich.
         while self._running:
             ret, frame = self._cap.read()
             if ret and frame is not None:
@@ -120,8 +125,9 @@ class CameraManager:
                     self._latest_frame = frame
                     self._frame_counter += 1
                     self._last_frame_ts = time.time()
+                time.sleep(0.005)
             else:
-                # Kurze Pause nur bei Lesefehler, um CPU zu schonen
+                # Kurze Pause bei Lesefehler, um CPU zu schonen
                 time.sleep(0.05)
 
     def _dummy_loop(self):

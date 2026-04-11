@@ -9,6 +9,7 @@ Zeigt:
   - Reset-Optionen
 """
 
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys, os
@@ -233,16 +234,40 @@ class DatabaseView(BaseView):
     # ------------------------------------------------------------------
 
     def on_show(self):
-        self._refresh_stats()
-        self._refresh_orders_combo()
-        self._refresh_inventory()
-        self._refresh_log()
+        threading.Thread(target=self._load_data_bg, daemon=True).start()
 
-    def _refresh_stats(self):
+    # ------------------------------------------------------------------
+    # Hintergrund-Laden aller Daten
+    # ------------------------------------------------------------------
+
+    def _load_data_bg(self):
+        """Lädt alle Daten außerhalb des UI-Threads und übergibt sie dann."""
         db = self.app.db
         if not db:
             return
-        stats = db.get_scan_stats()
+        try:
+            stats     = db.get_scan_stats()
+            orders    = db.get_orders()
+            inventory = db.get_inventory()
+            log       = db.get_scan_log(limit=200)
+            progress  = db.get_order_progress(orders[0]["id"]) if orders else {}
+        except Exception:
+            return
+        self.after(0, lambda: self._apply_data(stats, orders, inventory,
+                                               log, progress))
+
+    def _apply_data(self, stats, orders, inventory, log, progress):
+        """Aktualisiert alle Widgets im UI-Thread mit den vorab geladenen Daten."""
+        self._apply_stats(stats)
+        self._apply_orders_combo(orders, progress)
+        self._apply_inventory(inventory)
+        self._apply_log(log)
+
+    # ------------------------------------------------------------------
+    # Einzelne Apply-Methoden (laufen im UI-Thread)
+    # ------------------------------------------------------------------
+
+    def _apply_stats(self, stats):
         self._lbl_total.configure(text=str(stats["total"]))
         per_c = stats["per_container"]
         max_val = max(per_c.values(), default=1)
@@ -252,16 +277,79 @@ class DatabaseView(BaseView):
             self._stat_bars[i].set(pct)
             self._stat_labels[i].configure(text=str(cnt))
 
+    def _apply_orders_combo(self, orders, progress):
+        self._orders_cache = orders
+        names = [o["name"] for o in orders]
+        self._prog_combo["values"] = names
+        if names:
+            self._prog_combo.current(0)
+            self._apply_progress(progress)
+
+    def _apply_progress(self, progress):
+        for i in range(1, 7):
+            d = progress.get(i, {"required": 0, "fulfilled": 0, "percent": 0})
+            self._prog_bars[i].set(d["percent"])
+            self._prog_lbls[i].configure(
+                text=f"{d['fulfilled']} / {d['required']}")
+
+    def _apply_inventory(self, inventory):
+        # Alle Zeilen in einem einzigen Tcl-Aufruf löschen statt einer Schleife
+        self._inv_tree.delete(*self._inv_tree.get_children())
+        for item in inventory:
+            self._inv_tree.insert("", "end", values=(
+                item["part_num"],
+                item["name"],
+                item.get("color_name", ""),
+                item["container"],
+                item["count"],
+                item["updated_at"][:16],
+            ))
+
+    def _apply_log(self, log):
+        self._log_tree.delete(*self._log_tree.get_children())
+        for entry in log:
+            self._log_tree.insert("", "end", values=(
+                entry["scanned_at"][:16],
+                entry["part_num"],
+                entry["name"],
+                entry.get("color_name", ""),
+                f"{entry['score']:.0%}",
+                entry["container"],
+            ))
+
+    # ------------------------------------------------------------------
+    # Ältere Refresh-Methoden – delegieren an den Hintergrund-Lader
+    # ------------------------------------------------------------------
+
+    def _refresh_stats(self):
+        db = self.app.db
+        if not db:
+            return
+
+        def _load():
+            try:
+                stats = db.get_scan_stats()
+            except Exception:
+                return
+            self.after(0, lambda s=stats: self._apply_stats(s))
+
+        threading.Thread(target=_load, daemon=True).start()
+
     def _refresh_orders_combo(self):
         db = self.app.db
         if not db:
             return
-        self._orders_cache = db.get_orders()
-        names = [o["name"] for o in self._orders_cache]
-        self._prog_combo["values"] = names
-        if names:
-            self._prog_combo.current(0)
-            self._refresh_progress()
+
+        def _load():
+            try:
+                orders = db.get_orders()
+                progress = db.get_order_progress(orders[0]["id"]) if orders else {}
+            except Exception:
+                return
+            self.after(0, lambda o=orders, p=progress:
+                       self._apply_orders_combo(o, p))
+
+        threading.Thread(target=_load, daemon=True).start()
 
     def _refresh_progress(self, _event=None):
         db = self.app.db
@@ -275,44 +363,43 @@ class DatabaseView(BaseView):
                 break
         if order_id is None:
             return
-        progress = db.get_order_progress(order_id)
-        for i in range(1, 7):
-            d = progress.get(i, {"required": 0, "fulfilled": 0, "percent": 0})
-            self._prog_bars[i].set(d["percent"])
-            self._prog_lbls[i].configure(
-                text=f"{d['fulfilled']} / {d['required']}")
+
+        def _load():
+            try:
+                progress = db.get_order_progress(order_id)
+            except Exception:
+                return
+            self.after(0, lambda p=progress: self._apply_progress(p))
+
+        threading.Thread(target=_load, daemon=True).start()
 
     def _refresh_inventory(self):
-        for row in self._inv_tree.get_children():
-            self._inv_tree.delete(row)
         db = self.app.db
         if not db:
             return
-        for item in db.get_inventory():
-            self._inv_tree.insert("", "end", values=(
-                item["part_num"],
-                item["name"],
-                item.get("color_name", ""),
-                item["container"],
-                item["count"],
-                item["updated_at"][:16],
-            ))
+
+        def _load():
+            try:
+                inventory = db.get_inventory()
+            except Exception:
+                return
+            self.after(0, lambda inv=inventory: self._apply_inventory(inv))
+
+        threading.Thread(target=_load, daemon=True).start()
 
     def _refresh_log(self):
-        for row in self._log_tree.get_children():
-            self._log_tree.delete(row)
         db = self.app.db
         if not db:
             return
-        for entry in db.get_scan_log(limit=200):
-            self._log_tree.insert("", "end", values=(
-                entry["scanned_at"][:16],
-                entry["part_num"],
-                entry["name"],
-                entry.get("color_name", ""),
-                f"{entry['score']:.0%}",
-                entry["container"],
-            ))
+
+        def _load():
+            try:
+                log = db.get_scan_log(limit=200)
+            except Exception:
+                return
+            self.after(0, lambda l=log: self._apply_log(l))
+
+        threading.Thread(target=_load, daemon=True).start()
 
     def _reset_inventory(self):
         if messagebox.askyesno(

@@ -105,6 +105,14 @@ class SorterEngine:
             self._thread.join(timeout=3.0)
         logger.info("SorterEngine gestoppt.")
 
+    def reload_servo_positions(self):
+        """
+        Aktualisiert die Servo-Positionen aus der Datenbank.
+        Wird nach einer Kalibrierungsänderung aufgerufen, damit der laufende
+        Sort-Loop sofort die neuen Positionen verwendet.
+        """
+        self._reload_servo_positions()
+
     def pause(self):
         self._set_state(SorterState.PAUSED)
         self.gpio.belt_stop()
@@ -198,7 +206,6 @@ class SorterEngine:
             # 4. Servo einstellen und warten bis er sicher angekommen ist
             #    (servo_set_angle blockiert bereits für SERVO_MOVE_DELAY)
             self._set_state(SorterState.SORTING)
-            self._reload_servo_positions()
             self.gpio.servo_to_position(container, self._servo_positions)
 
             # 5. Band wieder starten und warten bis das Teil
@@ -248,12 +255,10 @@ class SorterEngine:
                 "color_name": result.color_name,
                 "container":  container,
             }
-            # In DB speichern
-            self.db.add_part(result.part_num, result.name, container,
-                             color_name=result.color_name)
-            self.db.log_scan(result.part_num, result.name, result.score,
-                             container, self._active_order_id,
-                             color_name=result.color_name)
+            # Inventar + Log in einer einzigen Transaktion speichern
+            self.db.record_scan(result.part_num, result.name, result.score,
+                                container, self._active_order_id,
+                                color_name=result.color_name)
             if self._mode == SortMode.ORDER and self._active_order_id:
                 self.db.fulfill_order_item(
                     self._active_order_id, result.part_num, container)
@@ -267,9 +272,8 @@ class SorterEngine:
                         container, result.score)
             return data
         else:
-            self.db.add_part("???", "Unbekannt", self.FALLBACK_CONTAINER)
-            self.db.log_scan("???", "Unbekannt", 0.0, self.FALLBACK_CONTAINER,
-                             self._active_order_id)
+            self.db.record_scan("???", "Unbekannt", 0.0,
+                                self.FALLBACK_CONTAINER, self._active_order_id)
             if self.on_part_unknown:
                 self.on_part_unknown(self.FALLBACK_CONTAINER)
             logger.info("Teil nicht erkannt → Behälter %d",
@@ -284,7 +288,7 @@ class SorterEngine:
         Im ORDER_MODE: prüft aktiven Auftrag nach Priorität.
           - Exakte Übereinstimmung (part_num + color_name) hat Vorrang vor
             allgemeiner Übereinstimmung (part_num allein, leere color_name).
-        Im SORT_MODE:  prüft Inventar, sonst Behälter 1.
+        Im SORT_MODE:  prüft Inventar via gezielter SQL-Abfrage, sonst Behälter 1.
         """
         if self._mode == SortMode.ORDER and self._active_order_id:
             items = self.db.get_order_items(self._active_order_id)
@@ -301,13 +305,11 @@ class SorterEngine:
                     if (item["part_num"] == part_num and
                             not item.get("color_name", "")):
                         return item["container"]
-        # SORT_MODE oder Teil nicht im Auftrag: Standardbehälter prüfen
-        inventory = self.db.get_inventory()
-        for entry in inventory:
-            if entry["part_num"] == part_num:
-                entry_color = entry.get("color_name", "")
-                if not entry_color or entry_color == color_name:
-                    return entry["container"]
+        # SORT_MODE oder Teil nicht im Auftrag: gezielter Inventar-Lookup
+        # (kein vollständiger Tabellen-Scan mehr)
+        container = self.db.get_container_for_part(part_num, color_name)
+        if container is not None:
+            return container
         return 1  # Neues Teil → Behälter 1
 
     def _set_state(self, state: SorterState):

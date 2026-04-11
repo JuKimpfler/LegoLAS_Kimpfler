@@ -105,6 +105,14 @@ class Database:
                 key         TEXT PRIMARY KEY,
                 value       TEXT NOT NULL
             );
+
+            -- Performance-Indizes für häufige Such-Queries
+            CREATE INDEX IF NOT EXISTS idx_inventory_part
+                ON inventory(part_num, color_name);
+            CREATE INDEX IF NOT EXISTS idx_scan_log_container
+                ON scan_log(container);
+            CREATE INDEX IF NOT EXISTS idx_order_items_order
+                ON order_items(order_id);
         """)
         self._conn.commit()
         self._init_servo_cal()
@@ -189,6 +197,34 @@ class Database:
         """)
         return [dict(row) for row in cur.fetchall()]
 
+    def get_container_for_part(self, part_num: str,
+                               color_name: str = "") -> Optional[int]:
+        """
+        Gibt den konfigurierten Behälter für ein Teil zurück, ohne das
+        gesamte Inventar zu laden.
+
+        Suchreihenfolge:
+          1. Exakter Treffer (part_num + color_name)
+          2. Farb-unabhängiger Treffer (part_num, leere color_name im Inventar)
+
+        Gibt ``None`` zurück, wenn kein Eintrag gefunden wurde.
+        """
+        cur = self._conn.cursor()
+        cur.execute(
+            "SELECT container FROM inventory WHERE part_num=? AND color_name=? LIMIT 1",
+            (part_num, color_name),
+        )
+        row = cur.fetchone()
+        if row:
+            return row["container"]
+        # Farb-unabhängiger Treffer
+        cur.execute(
+            "SELECT container FROM inventory WHERE part_num=? AND color_name='' LIMIT 1",
+            (part_num,),
+        )
+        row = cur.fetchone()
+        return row["container"] if row else None
+
     def get_part_total(self, part_num: str) -> int:
         """Gesamtanzahl aller Einträge für eine Teilenummer."""
         cur = self._conn.cursor()
@@ -210,6 +246,31 @@ class Database:
     def log_scan(self, part_num: str, name: str, score: float,
                  container: int, order_id: int = None, color_name: str = ""):
         self._conn.execute("""
+            INSERT INTO scan_log (part_num, name, color_name, score, container, order_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (part_num, name, color_name, score, container, order_id))
+        self._conn.commit()
+
+    def record_scan(self, part_num: str, name: str, score: float,
+                    container: int, order_id: int = None,
+                    color_name: str = ""):
+        """
+        Speichert einen Scan-Vorgang in einer einzigen Transaktion:
+        Inventar-Zähler erhöhen + Scan-Log-Eintrag anlegen.
+
+        Ersetzt die Kombination ``add_part()`` + ``log_scan()`` und halbiert
+        damit die Anzahl der SQLite-Commits pro Scan.
+        """
+        cur = self._conn.cursor()
+        cur.execute("""
+            INSERT INTO inventory (part_num, name, color_name, container, count, updated_at)
+            VALUES (?, ?, ?, ?, 1, datetime('now'))
+            ON CONFLICT(part_num, color_name, container) DO UPDATE SET
+                count      = count + 1,
+                name       = excluded.name,
+                updated_at = datetime('now')
+        """, (part_num, name, color_name, container))
+        cur.execute("""
             INSERT INTO scan_log (part_num, name, color_name, score, container, order_id)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (part_num, name, color_name, score, container, order_id))

@@ -8,6 +8,7 @@ Erlaubt:
   - Live-Anzeige des aktuellen Winkels
 """
 
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys, os
@@ -23,6 +24,10 @@ class CalibrationView(BaseView):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
+
+        # Zustand für Slider-Debounce und asynchronen Servo-Betrieb
+        self._servo_after_id = None   # ID des ausstehenden after()-Callbacks
+        self._servo_lock = threading.Lock()  # verhindert gleichzeitige Servo-Befehle
 
         # Titel
         ttk.Label(self, text="⚙️  Servo-Kalibrierung",
@@ -179,13 +184,37 @@ class CalibrationView(BaseView):
 
     def _on_slider(self, _value=None):
         angle = self._angle_var.get()
-        self._apply_angle(angle)
+        # Label sofort aktualisieren – kein Warten auf den Servo nötig
+        self._lbl_angle.configure(text=f"{angle:.1f} °")
+        # Debounce: ausstehenden Befehl verwerfen und neuen nach kurzer
+        # Pause planen, damit beim schnellen Schieben nicht jeder Pixel-Schritt
+        # einen blockierenden Servo-Befehl erzeugt.
+        if self._servo_after_id is not None:
+            self.after_cancel(self._servo_after_id)
+        self._servo_after_id = self.after(
+            150, lambda a=angle: self._apply_angle_async(a))
 
     def _apply_angle(self, angle: float):
+        """Label aktualisieren und Servo-Befehl in einem Background-Thread senden."""
         self._lbl_angle.configure(text=f"{angle:.1f} °")
+        # Eventuell ausstehenden debounced Slider-Befehl abbrechen
+        if self._servo_after_id is not None:
+            self.after_cancel(self._servo_after_id)
+            self._servo_after_id = None
+        self._apply_angle_async(angle)
+
+    def _apply_angle_async(self, angle: float):
+        """Servo-Bewegung im Hintergrund ausführen, damit der UI-Thread nicht blockiert."""
+        self._servo_after_id = None
         gpio = self.app.gpio
-        if gpio:
-            gpio.servo_set_angle(angle)
+        if not gpio:
+            return
+
+        def _run():
+            with self._servo_lock:
+                gpio.servo_set_angle(angle)
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _go_home(self):
         self._angle_var.set(0)
@@ -196,6 +225,10 @@ class CalibrationView(BaseView):
         db = self.app.db
         if db:
             db.set_servo_position(slot, angle)
+            # Sorter-Engine über neue Positionen informieren, damit der
+            # laufende Sort-Loop die aktualisierten Winkel sofort verwendet.
+            if self.app.engine:
+                self.app.engine.reload_servo_positions()
             self._refresh_table()
             messagebox.showinfo(
                 "Gespeichert",
