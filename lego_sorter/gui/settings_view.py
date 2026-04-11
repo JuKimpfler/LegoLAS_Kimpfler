@@ -11,6 +11,7 @@ Einstellungen:
 """
 
 import os
+import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import sys
@@ -18,6 +19,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as cfg
 from .base import BaseView
+from core.rebrickable import fetch_set_parts
 
 
 class SettingsView(BaseView):
@@ -101,6 +103,14 @@ class SettingsView(BaseView):
             row=row, column=1, padx=16, sticky="ew")
         row += 1
 
+        # Rebrickable API Key
+        ttk.Label(frm, text="Rebrickable API Key:").grid(
+            row=row, column=0, padx=16, pady=10, sticky="w")
+        self._rebrickable_key_var = tk.StringVar(value=cfg.REBRICKABLE_API_KEY)
+        ttk.Entry(frm, textvariable=self._rebrickable_key_var, width=36).grid(
+            row=row, column=1, padx=16, sticky="ew")
+        row += 1
+
         ttk.Separator(frm, orient="horizontal").grid(
             row=row, column=0, columnspan=2, sticky="ew", padx=16, pady=8)
         row += 1
@@ -133,8 +143,9 @@ class SettingsView(BaseView):
     def _build_orders(self):
         frm = self._tab_orders
         frm.columnconfigure(0, weight=1)
-        frm.rowconfigure(4, weight=1)
+        frm.rowconfigure(8, weight=1)
 
+        # --- Excel Import ---
         ttk.Label(frm,
                   text="Excel-Auftragsliste importieren\n"
                        "(Spalten: Teilenummer | Name | Anzahl | Behälter)",
@@ -149,12 +160,52 @@ class SettingsView(BaseView):
         ttk.Separator(frm, orient="horizontal").grid(
             row=2, column=0, sticky="ew", padx=16, pady=8)
 
-        ttk.Label(frm, text="Vorhandene Aufträge:").grid(
+        # --- Rebrickable Set Import ---
+        ttk.Label(frm,
+                  text="🌐  Auftrag aus LEGO-Set importieren (Rebrickable)",
+                  font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
             row=3, column=0, padx=16, pady=(8, 4), sticky="w")
+
+        rb_frm = ttk.Frame(frm)
+        rb_frm.grid(row=4, column=0, padx=16, pady=4, sticky="ew")
+        rb_frm.columnconfigure(1, weight=1)
+
+        ttk.Label(rb_frm, text="Set-ID (z. B. 75192-1):").grid(
+            row=0, column=0, padx=(0, 8), pady=4, sticky="w")
+        self._rb_set_id_var = tk.StringVar()
+        ttk.Entry(rb_frm, textvariable=self._rb_set_id_var, width=20).grid(
+            row=0, column=1, pady=4, sticky="w")
+
+        ttk.Label(rb_frm, text="Ziel-Behälter:").grid(
+            row=1, column=0, padx=(0, 8), pady=4, sticky="w")
+        self._rb_container_var = tk.StringVar(value="1")
+        ttk.Combobox(rb_frm,
+                     textvariable=self._rb_container_var,
+                     values=["1", "2", "3", "4", "5", "6"],
+                     width=6,
+                     state="readonly").grid(
+            row=1, column=1, pady=4, sticky="w")
+
+        btn_frm = ttk.Frame(frm)
+        btn_frm.grid(row=5, column=0, padx=16, pady=(4, 8), sticky="w")
+        self._rb_import_btn = ttk.Button(
+            btn_frm,
+            text="🔄  Set importieren",
+            command=self._import_from_rebrickable,
+            style="Accent.TButton")
+        self._rb_import_btn.pack(side="left")
+        self._rb_status_lbl = ttk.Label(btn_frm, text="", style="Muted.TLabel")
+        self._rb_status_lbl.pack(side="left", padx=10)
+
+        ttk.Separator(frm, orient="horizontal").grid(
+            row=6, column=0, sticky="ew", padx=16, pady=8)
+
+        ttk.Label(frm, text="Vorhandene Aufträge:").grid(
+            row=7, column=0, padx=16, pady=(8, 4), sticky="w")
 
         # Tabelle
         tree_frm = ttk.Frame(frm)
-        tree_frm.grid(row=4, column=0, padx=16, pady=4, sticky="nsew")
+        tree_frm.grid(row=8, column=0, padx=16, pady=4, sticky="nsew")
         tree_frm.columnconfigure(0, weight=1)
         tree_frm.rowconfigure(0, weight=1)
 
@@ -180,7 +231,7 @@ class SettingsView(BaseView):
         ttk.Button(frm, text="🗑  Ausgewählten Auftrag löschen",
                    command=self._delete_order,
                    style="Danger.TButton").grid(
-            row=5, column=0, padx=16, pady=8, sticky="w")
+            row=9, column=0, padx=16, pady=8, sticky="w")
 
     # ------------------------------------------------------------------
     # Tab: Export
@@ -231,6 +282,7 @@ class SettingsView(BaseView):
         db.set_setting("belt_speed", self._speed_var.get())
         db.set_setting("conf_threshold", self._thresh_var.get() / 100.0)
         db.set_setting("droidcam_url", self._droidcam_url_var.get())
+        db.set_setting("rebrickable_api_key", self._rebrickable_key_var.get())
         labels = {str(k): v.get() for k, v in self._container_labels.items()}
         db.set_setting("container_labels", labels)
         messagebox.showinfo("Gespeichert",
@@ -265,6 +317,73 @@ class SettingsView(BaseView):
             self._refresh_orders()
         except Exception as exc:
             messagebox.showerror("Fehler", str(exc), parent=self)
+
+    def _import_from_rebrickable(self):
+        set_id = self._rb_set_id_var.get().strip()
+        if not set_id:
+            messagebox.showerror("Fehler",
+                                 "Bitte eine Set-ID eingeben (z. B. 75192-1).",
+                                 parent=self)
+            return
+
+        try:
+            container = int(self._rb_container_var.get())
+        except ValueError:
+            messagebox.showerror("Fehler", "Ungültiger Behälter.", parent=self)
+            return
+
+        db = self.app.db
+        if not db:
+            return
+
+        api_key = db.get_setting("rebrickable_api_key", "")
+        if not api_key:
+            messagebox.showerror(
+                "Fehlender API Key",
+                "Kein Rebrickable API Key konfiguriert.\n"
+                "Bitte den Key im Tab 'Allgemein' eintragen und speichern.",
+                parent=self)
+            return
+
+        self._rb_import_btn.configure(state="disabled")
+        self._rb_status_lbl.configure(text="⏳ Lade Daten von Rebrickable…")
+        self.update_idletasks()
+
+        def _run():
+            try:
+                parts = fetch_set_parts(set_id, api_key)
+                order_name = f"Set {set_id if set_id.endswith('-1') else set_id + '-1'}"
+                items = [
+                    (part_num, color_name, container, qty)
+                    for part_num, _name, color_name, qty in parts
+                ]
+                self.after(0, lambda: _done(order_name, items))
+            except Exception as exc:
+                self.after(0, lambda msg=str(exc): _error(msg))
+
+        def _done(name, items):
+            try:
+                order_id = db.create_order(name, items)
+                self._rb_status_lbl.configure(
+                    text=f"✅ {len(items)} Teile importiert")
+                messagebox.showinfo(
+                    "Importiert",
+                    f"Auftrag '{name}' mit {len(items)} Teilen importiert "
+                    f"(ID={order_id}).",
+                    parent=self)
+                self._refresh_orders()
+            except Exception as exc:
+                messagebox.showerror("Fehler", str(exc), parent=self)
+                self._rb_status_lbl.configure(text="❌ Fehler")
+            finally:
+                self._rb_import_btn.configure(state="normal")
+
+        def _error(msg):
+            messagebox.showerror("Fehler beim Laden", msg, parent=self)
+            self._rb_status_lbl.configure(text="❌ Fehler")
+            self._rb_import_btn.configure(state="normal")
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _delete_order(self):
         sel = self._orders_tree.selection()
@@ -396,3 +515,6 @@ class SettingsView(BaseView):
             labels = db.get_setting("container_labels", {})
             for k, var in self._container_labels.items():
                 var.set(labels.get(str(k), f"Behälter {k}"))
+            rb_key = db.get_setting("rebrickable_api_key",
+                                    cfg.REBRICKABLE_API_KEY)
+            self._rebrickable_key_var.set(rb_key or "")

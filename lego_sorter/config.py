@@ -77,6 +77,12 @@ API_TIMEOUT          = 10    # Sekunden
 DEFAULT_CONF_THRESHOLD = 0.7  # Mindest-Konfidenz für Identifikation
 
 # ---------------------------------------------------------------------------
+# Rebrickable API
+# ---------------------------------------------------------------------------
+# API Key von https://rebrickable.com/api/ – in den Einstellungen änderbar.
+REBRICKABLE_API_KEY = ""
+
+# ---------------------------------------------------------------------------
 # Pfade & Dateien
 # ---------------------------------------------------------------------------
 BASE_DIR         = os.path.dirname(os.path.abspath(__file__))
