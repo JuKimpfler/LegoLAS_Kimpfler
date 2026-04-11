@@ -80,7 +80,7 @@ DEFAULT_CONF_THRESHOLD = 0.7  # Mindest-Konfidenz für Identifikation
 # Rebrickable API
 # ---------------------------------------------------------------------------
 # API Key von https://rebrickable.com/api/ – in den Einstellungen änderbar.
-REBRICKABLE_API_KEY = ""
+REBRICKABLE_API_KEY = "2304bd88eba85e2d859024a8fd791d57"
 
 # ---------------------------------------------------------------------------
 # Pfade & Dateien
