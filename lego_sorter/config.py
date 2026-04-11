@@ -15,7 +15,7 @@ PIN_MOTOR_IN2   = 23   # L298N IN2  (Richtung)
 PIN_MOTOR_ENA   = 27   # L298N ENA  (PWM-Geschwindigkeit)
 
 # Lichtschranke: True = Signal LOW wenn Teil erkannt
-SENSOR_ACTIVE_LOW = True
+SENSOR_ACTIVE_LOW = False
 
 # ---------------------------------------------------------------------------
 # Servo-Kalibrierung
