@@ -164,12 +164,13 @@ class DatabaseView(BaseView):
         tree_frm.columnconfigure(0, weight=1)
         tree_frm.rowconfigure(0, weight=1)
 
-        cols = ("part_num", "name", "container", "count", "updated_at")
+        cols = ("part_num", "name", "color_name", "container", "count", "updated_at")
         self._inv_tree = ttk.Treeview(tree_frm, columns=cols,
                                        show="headings", height=12)
         heads = {
             "part_num":   ("Teilenummer", 120),
-            "name":       ("Name",        200),
+            "name":       ("Name",        180),
+            "color_name": ("Farbe",       130),
             "container":  ("Behälter",     70),
             "count":      ("Anzahl",        70),
             "updated_at": ("Aktualisiert", 130),
@@ -204,13 +205,14 @@ class DatabaseView(BaseView):
         tree_frm.columnconfigure(0, weight=1)
         tree_frm.rowconfigure(0, weight=1)
 
-        cols = ("scanned_at", "part_num", "name", "score", "container")
+        cols = ("scanned_at", "part_num", "name", "color_name", "score", "container")
         self._log_tree = ttk.Treeview(tree_frm, columns=cols,
                                        show="headings", height=14)
         heads = {
             "scanned_at": ("Zeitstempel",  140),
             "part_num":   ("Teilenummer",  110),
-            "name":       ("Name",         180),
+            "name":       ("Name",         160),
+            "color_name": ("Farbe",        120),
             "score":      ("Konfidenz",     80),
             "container":  ("Behälter",      70),
         }
@@ -290,6 +292,7 @@ class DatabaseView(BaseView):
             self._inv_tree.insert("", "end", values=(
                 item["part_num"],
                 item["name"],
+                item.get("color_name", ""),
                 item["container"],
                 item["count"],
                 item["updated_at"][:16],
@@ -306,6 +309,7 @@ class DatabaseView(BaseView):
                 entry["scanned_at"][:16],
                 entry["part_num"],
                 entry["name"],
+                entry.get("color_name", ""),
                 f"{entry['score']:.0%}",
                 entry["container"],
             ))

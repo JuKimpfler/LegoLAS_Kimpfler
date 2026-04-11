@@ -2,7 +2,7 @@
 SQLite-Datenbank für LegoLAS.
 
 Tabellen:
-  - inventory   : Gezählte Teile mit Teilenummer, Name, Anzahl und Behälter.
+  - inventory   : Gezählte Teile mit Teilenummer, Farbe, Name, Anzahl und Behälter.
   - scan_log    : Jeder einzelne Scan mit Zeitstempel, Ergebnis, Konfidenz.
   - settings    : Allgemeine Schlüssel-Wert-Einstellungen (JSON-Blob).
   - servo_cal   : Kalibrierte Servo-Positionen pro Behälter-Slot.
@@ -37,6 +37,7 @@ class Database:
         self._conn: Optional[sqlite3.Connection] = None
         self._connect()
         self._create_tables()
+        self._migrate_schema()
 
     # ------------------------------------------------------------------
     # Verbindung
@@ -60,10 +61,11 @@ class Database:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 part_num    TEXT    NOT NULL,
                 name        TEXT    NOT NULL DEFAULT '',
+                color_name  TEXT    NOT NULL DEFAULT '',
                 container   INTEGER NOT NULL DEFAULT 6,
                 count       INTEGER NOT NULL DEFAULT 0,
                 updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-                UNIQUE(part_num, container)
+                UNIQUE(part_num, color_name, container)
             );
 
             CREATE TABLE IF NOT EXISTS scan_log (
@@ -71,6 +73,7 @@ class Database:
                 scanned_at  TEXT    NOT NULL DEFAULT (datetime('now')),
                 part_num    TEXT    NOT NULL,
                 name        TEXT    NOT NULL DEFAULT '',
+                color_name  TEXT    NOT NULL DEFAULT '',
                 score       REAL    NOT NULL DEFAULT 0.0,
                 container   INTEGER NOT NULL DEFAULT 6,
                 order_id    INTEGER
@@ -87,6 +90,7 @@ class Database:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
                 part_num    TEXT    NOT NULL,
+                color_name  TEXT    NOT NULL DEFAULT '',
                 container   INTEGER NOT NULL,
                 required    INTEGER NOT NULL DEFAULT 0,
                 fulfilled   INTEGER NOT NULL DEFAULT 0
@@ -105,6 +109,49 @@ class Database:
         self._conn.commit()
         self._init_servo_cal()
 
+    def _migrate_schema(self):
+        """Ergänzt fehlende Spalten in bestehenden Datenbanken."""
+        cur = self._conn.cursor()
+
+        # -- inventory: color_name + UNIQUE(part_num, color_name, container) --
+        cur.execute("PRAGMA table_info(inventory)")
+        inv_cols = {row["name"] for row in cur.fetchall()}
+        if "color_name" not in inv_cols:
+            self._conn.executescript("""
+                CREATE TABLE inventory_new (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    part_num    TEXT    NOT NULL,
+                    name        TEXT    NOT NULL DEFAULT '',
+                    color_name  TEXT    NOT NULL DEFAULT '',
+                    container   INTEGER NOT NULL DEFAULT 6,
+                    count       INTEGER NOT NULL DEFAULT 0,
+                    updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(part_num, color_name, container)
+                );
+                INSERT INTO inventory_new
+                    (part_num, name, color_name, container, count, updated_at)
+                SELECT part_num, name, '', container, count, updated_at
+                FROM inventory;
+                DROP TABLE inventory;
+                ALTER TABLE inventory_new RENAME TO inventory;
+            """)
+
+        # -- scan_log: color_name --
+        cur.execute("PRAGMA table_info(scan_log)")
+        sl_cols = {row["name"] for row in cur.fetchall()}
+        if "color_name" not in sl_cols:
+            self._conn.execute(
+                "ALTER TABLE scan_log ADD COLUMN color_name TEXT NOT NULL DEFAULT ''")
+            self._conn.commit()
+
+        # -- order_items: color_name --
+        cur.execute("PRAGMA table_info(order_items)")
+        oi_cols = {row["name"] for row in cur.fetchall()}
+        if "color_name" not in oi_cols:
+            self._conn.execute(
+                "ALTER TABLE order_items ADD COLUMN color_name TEXT NOT NULL DEFAULT ''")
+            self._conn.commit()
+
     def _init_servo_cal(self):
         """Füllt Servo-Kalibriertabelle mit Standardwerten, falls leer."""
         cur = self._conn.cursor()
@@ -120,24 +167,24 @@ class Database:
     # ------------------------------------------------------------------
 
     def add_part(self, part_num: str, name: str,
-                 container: int, count: int = 1):
+                 container: int, count: int = 1, color_name: str = ""):
         """Erhöht den Bestand eines Teils im angegebenen Behälter."""
         cur = self._conn.cursor()
         cur.execute("""
-            INSERT INTO inventory (part_num, name, container, count, updated_at)
-            VALUES (?, ?, ?, ?, datetime('now'))
-            ON CONFLICT(part_num, container) DO UPDATE SET
+            INSERT INTO inventory (part_num, name, color_name, container, count, updated_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(part_num, color_name, container) DO UPDATE SET
                 count      = count + excluded.count,
                 name       = excluded.name,
                 updated_at = datetime('now')
-        """, (part_num, name, container, count))
+        """, (part_num, name, color_name, container, count))
         self._conn.commit()
 
     def get_inventory(self) -> List[dict]:
         """Gibt alle Inventareinträge zurück."""
         cur = self._conn.cursor()
         cur.execute("""
-            SELECT part_num, name, container, count, updated_at
+            SELECT part_num, name, color_name, container, count, updated_at
             FROM inventory ORDER BY container, part_num
         """)
         return [dict(row) for row in cur.fetchall()]
@@ -161,11 +208,11 @@ class Database:
     # ------------------------------------------------------------------
 
     def log_scan(self, part_num: str, name: str, score: float,
-                 container: int, order_id: int = None):
+                 container: int, order_id: int = None, color_name: str = ""):
         self._conn.execute("""
-            INSERT INTO scan_log (part_num, name, score, container, order_id)
-            VALUES (?, ?, ?, ?, ?)
-        """, (part_num, name, score, container, order_id))
+            INSERT INTO scan_log (part_num, name, color_name, score, container, order_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (part_num, name, color_name, score, container, order_id))
         self._conn.commit()
 
     def get_scan_log(self, limit: int = 200) -> List[dict]:
@@ -231,7 +278,7 @@ class Database:
     # ------------------------------------------------------------------
 
     def create_order(self, name: str,
-                     items: List[Tuple[str, int, int]]) -> int:
+                     items: List[Tuple[str, str, int, int]]) -> int:
         """
         Erstellt einen neuen Auftrag.
 
@@ -239,7 +286,7 @@ class Database:
         ----------
         name : str
             Auftragsname.
-        items : List[Tuple[part_num, container, required]]
+        items : List[Tuple[part_num, color_name, container, required]]
 
         Returns
         -------
@@ -249,11 +296,11 @@ class Database:
         cur.execute(
             "INSERT INTO orders (name) VALUES (?)", (name,))
         order_id = cur.lastrowid
-        for part_num, container, required in items:
+        for part_num, color_name, container, required in items:
             cur.execute("""
-                INSERT INTO order_items (order_id, part_num, container, required)
-                VALUES (?,?,?,?)
-            """, (order_id, part_num, container, required))
+                INSERT INTO order_items (order_id, part_num, color_name, container, required)
+                VALUES (?,?,?,?,?)
+            """, (order_id, part_num, color_name, container, required))
         self._conn.commit()
         return order_id
 
@@ -329,6 +376,7 @@ class Database:
             self.add_part(
                 part_num=row.get("part_num", ""),
                 name=row.get("name", ""),
+                color_name=row.get("color_name", ""),
                 container=int(row.get("container", 6)),
                 count=int(row.get("count", 0)),
             )

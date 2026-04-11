@@ -8,6 +8,7 @@ Spaltenformat der Excel-Vorlage:
   B: Name (name)
   C: Anzahl (required)
   D: Behälter (container, 1–6)
+  E: Farbe (color, optional – Textname wie "Dark Bluish Gray")
 
 Prioritätsregel: Behälter 1 hat höchste Priorität,
                  Behälter 6 ist die Aussortierschublade.
@@ -56,14 +57,14 @@ class OrderManager:
     # Import
     # ------------------------------------------------------------------
 
-    def import_order(self, filepath: str) -> Tuple[str, List[Tuple[str, int, int]]]:
+    def import_order(self, filepath: str) -> Tuple[str, List[Tuple[str, str, int, int]]]:
         """
         Liest eine Auftragsliste aus einer Excel-Datei.
 
         Rückgabe
         --------
         (order_name, items)
-        items = [(part_num, container, required), ...]
+        items = [(part_num, color_name, container, required), ...]
         """
         if not _OPENPYXL:
             raise RuntimeError("openpyxl ist nicht installiert.")
@@ -71,7 +72,7 @@ class OrderManager:
         wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
         ws = wb.active
         order_name = os.path.splitext(os.path.basename(filepath))[0]
-        items: List[Tuple[str, int, int]] = []
+        items: List[Tuple[str, str, int, int]] = []
 
         for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
             if row_idx == 1 and self._is_header(row):
@@ -83,7 +84,13 @@ class OrderManager:
             required = int(row[2]) if len(row) > 2 and row[2] else 1
             container = int(row[3]) if len(row) > 3 and row[3] else 6
             container = max(1, min(6, container))
-            items.append((part_num, container, required))
+            # Farbe aus Spalte E lesen; leer/ungültig → keine Farbeinschränkung
+            color_name = ""
+            if len(row) > 4 and row[4] is not None:
+                raw_color = str(row[4]).strip()
+                if raw_color and raw_color.lower() not in {"", "-", "n/a", "none", "keine"}:
+                    color_name = raw_color
+            items.append((part_num, color_name, container, required))
 
         wb.close()
         logger.info("Auftrag importiert: %s (%d Positionen)", order_name, len(items))
@@ -93,7 +100,7 @@ class OrderManager:
     def _is_header(row) -> bool:
         if not row or row[0] is None:
             return False
-        return str(row[0]).lower() in {"teilenummer", "part_num", "part", "id"}
+        return str(row[0]).lower() in {"teilenummer", "part_num", "part", "id", "part id"}
 
     # ------------------------------------------------------------------
     # Export: Auftragsliste
@@ -121,7 +128,7 @@ class OrderManager:
         ws = wb.active
         ws.title = "Auftrag"
 
-        headers = ["Teilenummer", "Name", "Behälter",
+        headers = ["Teilenummer", "Name", "Farbe", "Behälter",
                    "Soll", "Ist", "Offen"]
         self._write_header(ws, headers)
 
@@ -132,6 +139,7 @@ class OrderManager:
             row_data = [
                 item.get("part_num", ""),
                 item.get("name", ""),
+                item.get("color_name", ""),
                 item.get("container", ""),
                 item.get("required", 0),
                 item.get("fulfilled", 0),
@@ -174,7 +182,7 @@ class OrderManager:
         ws = wb.active
         ws.title = "Fehlende Teile"
 
-        headers = ["Behälter", "Teilenummer", "Name", "Soll", "Ist", "Fehlt"]
+        headers = ["Behälter", "Teilenummer", "Name", "Farbe", "Soll", "Ist", "Fehlt"]
         self._write_header(ws, headers)
 
         for idx, item in enumerate(sorted(missing,
@@ -186,6 +194,7 @@ class OrderManager:
                 item.get("container", ""),
                 item.get("part_num", ""),
                 item.get("name", ""),
+                item.get("color_name", ""),
                 item.get("required", 0),
                 item.get("fulfilled", 0),
                 fehlt,
@@ -214,7 +223,7 @@ class OrderManager:
         ws = wb.active
         ws.title = "Inventar"
 
-        headers = ["Teilenummer", "Name", "Behälter", "Anzahl", "Zuletzt aktualisiert"]
+        headers = ["Teilenummer", "Name", "Farbe", "Behälter", "Anzahl", "Zuletzt aktualisiert"]
         self._write_header(ws, headers)
 
         for idx, item in enumerate(inventory):
@@ -223,6 +232,7 @@ class OrderManager:
             ws.append([
                 item.get("part_num", ""),
                 item.get("name", ""),
+                item.get("color_name", ""),
                 item.get("container", ""),
                 item.get("count", 0),
                 item.get("updated_at", ""),

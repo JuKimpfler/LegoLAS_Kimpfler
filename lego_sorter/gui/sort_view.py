@@ -370,12 +370,19 @@ class SortView(BaseView):
         """Wird im Main-Thread aufgerufen, nachdem der manuelle Scan abgeschlossen ist."""
         self._btn_scan.configure(state="normal", text="📷  Scannen  [Space]")
         if result:
-            self._lbl_part.configure(
-                text=f"{result['part_num']}  {result['name']}  "
-                     f"({result['score']:.0%})")
+            color = result.get("color_name", "")
+            part_text = (
+                f"{result['part_num']} – {result['name']} ({color})  "
+                f"[{result['score']:.0%}]"
+                if color else
+                f"{result['part_num']} – {result['name']}  "
+                f"[{result['score']:.0%}]"
+            )
+            self._lbl_part.configure(text=part_text)
             self._lbl_container.configure(
                 text=f"Behälter {result['container']}")
         else:
+            engine = self.app.engine
             self._lbl_part.configure(text="Nicht erkannt")
             self._lbl_container.configure(
                 text=f"Behälter {engine.FALLBACK_CONTAINER}")
@@ -442,8 +449,9 @@ class SortView(BaseView):
         text, color = state_labels.get(state, (str(state.name), cfg.THEME_TEXT))
         self._lbl_state.configure(text=text, foreground=color)
 
-    def update_part(self, part_num, name, score, container):
+    def update_part(self, part_num, name, score, container, color_name=""):
+        color_suffix = f" ({color_name})" if color_name else ""
         self._lbl_part.configure(
-            text=f"{part_num}  {name}  ({score:.0%})")
+            text=f"{part_num} – {name}{color_suffix}  ({score:.0%})")
         self._lbl_container.configure(
             text=f"Behälter {container}")
