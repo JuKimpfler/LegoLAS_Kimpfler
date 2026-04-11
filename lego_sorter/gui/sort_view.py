@@ -2,7 +2,7 @@
 Sortier-Ansicht für LegoLAS GUI.
 
 Enthält:
-  - Live-Kameravorschau
+  - Kamera-Statusanzeige (kein Live-Bild, nur Text-Status für bessere Performance)
   - Status-Panel (Zustand, letztes Teil, Behälter)
   - Manuelle Steuerung (Band, Scan, Weiche)
   - Umschaltung Manuell / Automatik
@@ -15,14 +15,22 @@ Tastaturkürzel:
   1–6      – Weiche manuell stellen
 
 Performance-Hinweise (Raspberry Pi 3B):
+  - Kamera-Preview standardmäßig deaktiviert (GUI_SHOW_CAMERA_PREVIEW = False).
+    Stattdessen wird nur ein leichter Status-Text angezeigt (online/offline,
+    Frame-Zähler, Lag-Erkennung). Dies spart erheblich CPU/RAM auf dem Pi 3.
+  - Preview kann in config.py mit GUI_SHOW_CAMERA_PREVIEW = True wieder aktiviert werden.
   - Kamera-Loop und Sensor-Loop sind entkoppelt.
   - Beide Loops werden bei on_hide() pausiert und bei on_show() fortgesetzt.
   - Label-Updates erfolgen nur bei tatsächlichen Wertänderungen.
+  - Manueller Scan läuft in einem eigenen Thread, damit der Tkinter-Main-Thread
+    nicht durch den blockierenden Brickognize-API-Aufruf einfriert.
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import math
 import sys, os
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as cfg
@@ -209,10 +217,10 @@ class SortView(BaseView):
                                      style="Accent.TButton")
         self._btn_belt.grid(row=2, column=0, padx=8, pady=4, sticky="ew")
 
-        ttk.Button(frm, text="📷  Scannen  [Space]",
-                   command=self._manual_scan,
-                   style="TButton").grid(
-            row=2, column=1, padx=8, pady=4, sticky="ew")
+        self._btn_scan = ttk.Button(frm, text="📷  Scannen  [Space]",
+                                    command=self._manual_scan,
+                                    style="TButton")
+        self._btn_scan.grid(row=2, column=1, padx=8, pady=4, sticky="ew")
 
     # ------------------------------------------------------------------
     # Behälter-Schnellauswahl
@@ -246,22 +254,43 @@ class SortView(BaseView):
         if not self.winfo_exists():
             return
         cam = self.app.camera
-        if cam and cam.is_open and _PIL:
-            current_counter = cam.frame_counter
-            if current_counter != self._last_frame_counter:
-                self._last_frame_counter = current_counter
-                w = self._cam_label.winfo_width() or 400
-                h = self._cam_label.winfo_height() or 300
-                if w < 10:
-                    w, h = 400, 300
-                img = cam.get_pil_image(width=w, height=h)
-                if img:
-                    photo = ImageTk.PhotoImage(img)
-                    self._cam_label.configure(image=photo, text="")
-                    self._cam_label.image = photo  # Referenz halten
 
-        self._camera_after_id = self.after(
-            int(1000 / cfg.LIVE_FPS), self._update_camera)
+        if cfg.GUI_SHOW_CAMERA_PREVIEW:
+            # ── Vollbild-Preview (CPU-intensiv, für stärkere Hardware) ──────
+            if cam and cam.is_open and _PIL:
+                current_counter = cam.frame_counter
+                if current_counter != self._last_frame_counter:
+                    self._last_frame_counter = current_counter
+                    w = self._cam_label.winfo_width() or 400
+                    h = self._cam_label.winfo_height() or 300
+                    if w < 10:
+                        w, h = 400, 300
+                    img = cam.get_pil_image(width=w, height=h)
+                    if img:
+                        photo = ImageTk.PhotoImage(img)
+                        self._cam_label.configure(image=photo, text="")
+                        self._cam_label.image = photo  # Referenz halten
+            interval_ms = int(1000 / max(1, cfg.LIVE_FPS))
+        else:
+            # ── Leichter Status-Text (Standard für Raspberry Pi 3) ──────────
+            if cam and cam.is_open:
+                counter = cam.frame_counter
+                lag = cam.seconds_since_last_frame
+                if math.isinf(lag):
+                    status = "📷  Kamera: verbunden – warte auf ersten Frame…"
+                elif lag > 5:
+                    status = (f"⚠️  Kamera: hängt – kein neuer Frame seit "
+                              f"{lag:.0f} s  |  Frames: {counter}")
+                else:
+                    if counter != self._last_frame_counter:
+                        self._last_frame_counter = counter
+                    status = f"✅  Kamera: OK  |  Frames: {counter}"
+            else:
+                status = "❌  Kamera: offline – DroidCam-URL in config.py prüfen"
+            self._cam_label.configure(image="", text=status)
+            interval_ms = int(1000 / max(1, cfg.GUI_STATUS_FPS))
+
+        self._camera_after_id = self.after(interval_ms, self._update_camera)
 
     # ------------------------------------------------------------------
     # Sensor-Poll (leichtgewichtig, unabhängig von der Kamera)
@@ -327,7 +356,19 @@ class SortView(BaseView):
         engine = self.app.engine
         if not engine:
             return
-        result = engine.manual_scan()
+        # Scan-Button sperren, damit kein Doppelklick möglich ist
+        self._btn_scan.configure(state="disabled", text="⏳  Scanne…")
+
+        def _do_scan():
+            result = engine.manual_scan()
+            # Ergebnis im Tkinter-Main-Thread verarbeiten
+            self.after(0, lambda: self._on_manual_scan_done(result))
+
+        threading.Thread(target=_do_scan, daemon=True).start()
+
+    def _on_manual_scan_done(self, result):
+        """Wird im Main-Thread aufgerufen, nachdem der manuelle Scan abgeschlossen ist."""
+        self._btn_scan.configure(state="normal", text="📷  Scannen  [Space]")
         if result:
             self._lbl_part.configure(
                 text=f"{result['part_num']}  {result['name']}  "

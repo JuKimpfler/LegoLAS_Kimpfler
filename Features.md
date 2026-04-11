@@ -18,10 +18,10 @@ Vollständige Beschreibung aller implementierten Funktionen auf Basis des aktuel
 
 ## 2. Sortier-Ansicht (F2)
 
-### Live-Kameravorschau
-- Anzeige des DroidCam-Streams in Echtzeit (Standard: **8 FPS**, konfigurierbar)
-- Skaliert automatisch auf die verfügbare Fenstergröße
-- Zeigt Platzhaltertext, wenn Kamera nicht verbunden
+### Kamera-Statusanzeige
+- Standardmäßig wird **kein Live-Kamerabild** gerendert, sondern nur ein leichter **Status-Text** (Kamera online/offline, Frame-Zähler, Lag-Warnung). Dies reduziert die CPU-Last auf dem Raspberry Pi 3 erheblich.
+- Update-Frequenz: 1 Hz (konfigurierbar über `GUI_STATUS_FPS`)
+- **Live-Preview aktivieren**: In `config.py` `GUI_SHOW_CAMERA_PREVIEW = True` setzen (Standard: `False`). Bei aktivierter Preview: automatische Skalierung auf Fenstergröße, konfigurierbar über `LIVE_FPS`.
 
 ### Status-Panel
 - **Zustand**: IDLE / Warte auf Teil / Band stoppt / Scanne / Sortiere / Band läuft / FEHLER / PAUSIERT
@@ -36,7 +36,7 @@ Vollständige Beschreibung aller implementierten Funktionen auf Basis des aktuel
 
 ### Manuelle Steuerung
 - **Band starten / stoppen** (Button + Taste `B`)
-- **Manuell scannen** (Button + Taste `Space`): Einzelscan ohne automatischen Loop
+- **Manuell scannen** (Button + Taste `Space`): Einzelscan ohne automatischen Loop; läuft in eigenem Thread, damit die GUI reaktionsfähig bleibt
 - **Weiche stellen** (Buttons 1–6 + Tasten `1`–`6`): Servo direkt auf gespeicherte Behälterposition fahren
 
 ---
@@ -185,7 +185,10 @@ IDLE → WAITING_FOR_PART → STOPPING_BELT → SCANNING → SORTING → BELT_RE
 - URL: `http://localhost:4747/video` (konfigurierbar)
 - Auflösung: 640 × 480 Pixel
 - Kontinuierlicher Capture-Loop in eigenem Thread (thread-sicher)
-- Frame-Bereitstellung als BGR-Array (OpenCV) und als PIL-Image (für tkinter)
+- **Kein Sleep im Capture-Loop** – liest Frames so schnell wie möglich, um den internen OpenCV/FFMPEG-Puffer leer zu halten und Stream-Lag zu minimieren
+- `CAP_PROP_BUFFERSIZE = 1` gesetzt, um interne Puffer-Aufbauung zu reduzieren
+- Statusinfos: `is_open`, `frame_counter`, `last_frame_ts`, `seconds_since_last_frame`
+- Frame-Bereitstellung als BGR-Array (OpenCV) und als PIL-Image (für tkinter, wenn Preview aktiv)
 - JPEG-Kodierung für Brickognize-API-Upload (Qualität 90 %)
 - Fallback-Dummy wenn DroidCam nicht verbunden oder OpenCV fehlt
 

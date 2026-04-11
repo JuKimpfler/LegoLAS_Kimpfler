@@ -45,6 +45,7 @@ class CameraManager:
         self._cap = None
         self._latest_frame: Optional[np.ndarray] = None
         self._frame_counter: int = 0   # Wird bei jedem neuen Frame erhöht
+        self._last_frame_ts: float = 0.0   # Zeitstempel des letzten empfangenen Frames
         self._lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -85,6 +86,8 @@ class CameraManager:
 
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cfg.CAMERA_WIDTH)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.cfg.CAMERA_HEIGHT)
+        # Puffergröße minimieren, um Lag im HTTP-Stream zu reduzieren
+        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -106,18 +109,20 @@ class CameraManager:
     # ------------------------------------------------------------------
 
     def _capture_loop(self):
-        interval = 1.0 / max(1, self.cfg.LIVE_FPS)
+        # Kein Sleep – so schnell wie möglich lesen, um den internen
+        # OpenCV/FFMPEG-Puffer leer zu halten und stets den neuesten Frame
+        # zu erhalten. Dadurch wird der typische 10-Sekunden-Lag bei
+        # DroidCam-over-HTTP (MJPEG) eliminiert.
         while self._running:
-            t0 = time.time()
             ret, frame = self._cap.read()
             if ret and frame is not None:
                 with self._lock:
                     self._latest_frame = frame
                     self._frame_counter += 1
-            elapsed = time.time() - t0
-            sleep_time = interval - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+                    self._last_frame_ts = time.time()
+            else:
+                # Kurze Pause nur bei Lesefehler, um CPU zu schonen
+                time.sleep(0.05)
 
     def _dummy_loop(self):
         """Erzeugt graue Platzhalter-Frames wenn kein DroidCam-Stream verfügbar."""
@@ -147,6 +152,24 @@ class CameraManager:
         """Zähler der bisher empfangenen Frames – nützlich für Change-Detection."""
         with self._lock:
             return self._frame_counter
+
+    @property
+    def last_frame_ts(self) -> float:
+        """Unix-Zeitstempel (time.time()) des zuletzt empfangenen Frames."""
+        with self._lock:
+            return self._last_frame_ts
+
+    @property
+    def seconds_since_last_frame(self) -> float:
+        """Sekunden seit dem letzten empfangenen Frame.
+
+        Gibt ``math.inf`` zurück, wenn noch kein Frame empfangen wurde
+        (d. h. ``last_frame_ts`` ist 0.0).
+        """
+        with self._lock:
+            if self._last_frame_ts == 0.0:
+                return float("inf")
+            return time.time() - self._last_frame_ts
 
     def get_frame(self) -> Optional[np.ndarray]:
         """Gibt den aktuellsten Frame als BGR-Array zurück."""
