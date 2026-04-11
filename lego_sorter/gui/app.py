@@ -29,6 +29,7 @@ import os
 import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
+from typing import Optional
 
 # Pfad-Anpassung
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -58,6 +59,14 @@ _TABS = [
     ("database",    "📊", "Datenbank",     "F5"),
 ]
 
+# View-Klassen (lazy initialization)
+_VIEW_CLASSES = {
+    "sort":        SortView,
+    "calibration": CalibrationView,
+    "settings":    SettingsView,
+    "database":    DatabaseView,
+}
+
 
 class LegoLASApp(tk.Tk):
     """
@@ -77,6 +86,12 @@ class LegoLASApp(tk.Tk):
         # Shared State
         # ------------------------------------------------------------------
         self.active_order_id: int = None
+
+        # Coalesced engine-callback state (set from worker thread, flushed in UI thread)
+        self._pending_state_update: Optional[SorterState] = None
+        self._state_cb_pending: bool = False
+        self._pending_part_update: Optional[tuple] = None
+        self._part_cb_pending: bool = False
 
         # ------------------------------------------------------------------
         # Hardware / Core Initialisierung
@@ -211,45 +226,52 @@ class LegoLASApp(tk.Tk):
         self._container.rowconfigure(0, weight=1)
         self._container.columnconfigure(0, weight=1)
 
-        self._views = {
-            "sort":        SortView(self._container, self),
-            "calibration": CalibrationView(self._container, self),
-            "settings":    SettingsView(self._container, self),
-            "database":    DatabaseView(self._container, self),
-        }
-        for view in self._views.values():
-            view.grid(row=0, column=0, sticky="nsew")
-
+        # Views werden erst beim ersten Zugriff erstellt (lazy initialization).
+        self._views: dict = {}
         self._current_view_key = None
+
+    def _get_or_create_view(self, key: str):
+        """Erstellt eine View beim ersten Zugriff und gibt sie zurück."""
+        if key not in self._views:
+            cls = _VIEW_CLASSES.get(key)
+            if cls is None:
+                return None
+            view = cls(self._container, self)
+            view.grid(row=0, column=0, sticky="nsew")
+            self._views[key] = view
+        return self._views[key]
 
     def _show_view(self, key: str):
         if self._current_view_key == key:
             return
         # Alte View ausblenden
-        if self._current_view_key:
-            old_view = self._views.get(self._current_view_key)
+        prev_key = self._current_view_key
+        if prev_key:
+            old_view = self._views.get(prev_key)
             if old_view:
                 old_view.on_hide()
 
-        # Neue View nach oben bringen
-        view = self._views.get(key)
+        # Neue View holen/erstellen und nach vorne bringen
+        view = self._get_or_create_view(key)
         if view:
             view.tkraise()
             view.on_show()
             self._current_view_key = key
 
-        # Tab-Button hervorheben
-        for k, btn in self._tab_buttons.items():
-            if k == key:
-                btn.configure(
-                    bg=cfg.THEME_ACCENT,
-                    fg=cfg.THEME_BG,
-                    font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"))
-            else:
-                btn.configure(
+        # Tab-Button hervorheben – nur die zwei betroffenen Buttons ändern
+        if prev_key:
+            old_btn = self._tab_buttons.get(prev_key)
+            if old_btn:
+                old_btn.configure(
                     bg=cfg.THEME_SURFACE,
                     fg=cfg.THEME_MUTED,
                     font=cfg.FONT_BODY)
+        new_btn = self._tab_buttons.get(key)
+        if new_btn:
+            new_btn.configure(
+                bg=cfg.THEME_ACCENT,
+                fg=cfg.THEME_BG,
+                font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold"))
 
         # Statusleiste aktualisieren
         tab_label = next(
@@ -318,19 +340,43 @@ class LegoLASApp(tk.Tk):
 
     # ------------------------------------------------------------------
     # Engine-Callbacks (aus Worker-Thread → in GUI-Thread dispatchen)
+    # Coalescing: mehrfache Aufrufe innerhalb einer Event-Loop-Iteration
+    # werden zu einem einzigen UI-Update zusammengefasst.
     # ------------------------------------------------------------------
 
     def _on_engine_state(self, state: SorterState):
-        self.after(0, self._update_sort_view_state, state)
+        self._pending_state_update = state
+        if not self._state_cb_pending:
+            self._state_cb_pending = True
+            self.after(0, self._flush_state_update)
+
+    def _flush_state_update(self):
+        self._state_cb_pending = False
+        state = self._pending_state_update
+        self._pending_state_update = None
+        if state is not None:
+            self._update_sort_view_state(state)
 
     def _on_part_identified(self, part_num, name, score, container,
                              color_name=""):
-        self.after(0, self._update_sort_view_part,
-                   part_num, name, score, container, color_name)
+        self._pending_part_update = (part_num, name, score, container,
+                                     color_name)
+        if not self._part_cb_pending:
+            self._part_cb_pending = True
+            self.after(0, self._flush_part_update)
+
+    def _flush_part_update(self):
+        self._part_cb_pending = False
+        data = self._pending_part_update
+        self._pending_part_update = None
+        if data is not None:
+            self._update_sort_view_part(*data)
 
     def _on_part_unknown(self, container):
-        self.after(0, self._update_sort_view_part,
-                   "???", "Unbekannt", 0.0, container, "")
+        self._pending_part_update = ("???", "Unbekannt", 0.0, container, "")
+        if not self._part_cb_pending:
+            self._part_cb_pending = True
+            self.after(0, self._flush_part_update)
 
     def _update_sort_view_state(self, state: SorterState):
         view = self._views.get("sort")

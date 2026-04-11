@@ -129,7 +129,7 @@ def apply_theme(root: tk.Tk):
                     background=cfg.THEME_SURFACE,
                     foreground=cfg.THEME_TEXT,
                     fieldbackground=cfg.THEME_SURFACE,
-                    rowheight=30,
+                    rowheight=26,
                     borderwidth=0,
                     relief="flat")
     style.configure("Treeview.Heading",

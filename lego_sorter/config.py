@@ -120,7 +120,7 @@ FONT_TITLE       = ("Helvetica", 15, "bold")
 FONT_SMALL       = ("Helvetica", 9)
 
 # Performance-Einstellungen für Raspberry Pi 3B
-SENSOR_POLL_MS   = 120   # Sensor-Abfrage-Intervall (ms) – unabhängig von Kamera
+SENSOR_POLL_MS   = 150   # Sensor-Abfrage-Intervall (ms) – unabhängig von Kamera
 TOOLBAR_HEIGHT   = 60    # Toolbar-Höhe in Pixel (touch-freundlich)
 
 # Tastatur-Bindings

@@ -28,6 +28,10 @@ class SettingsView(BaseView):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
+        # Debounce-IDs für Slider (Motorgeschwindigkeit und Erkennungsschwelle)
+        self._speed_after_id: str = None
+        self._thresh_after_id: str = None
+
         ttk.Label(self, text="🛠  Einstellungen",
                   style="Title.TLabel").grid(
             row=0, column=0, pady=(16, 4), sticky="n")
@@ -264,6 +268,13 @@ class SettingsView(BaseView):
     def _on_speed_change(self, _=None):
         val = self._speed_var.get()
         self._lbl_speed.configure(text=f"{val}%")
+        if self._speed_after_id is not None:
+            self.after_cancel(self._speed_after_id)
+        self._speed_after_id = self.after(
+            150, lambda v=int(val): self._apply_speed(v))
+
+    def _apply_speed(self, val: int):
+        self._speed_after_id = None
         engine = self.app.engine
         if engine:
             engine.belt_speed = val
@@ -271,6 +282,13 @@ class SettingsView(BaseView):
     def _on_thresh_change(self, _=None):
         val = self._thresh_var.get()
         self._lbl_thresh.configure(text=f"{val}%")
+        if self._thresh_after_id is not None:
+            self.after_cancel(self._thresh_after_id)
+        self._thresh_after_id = self.after(
+            150, lambda v=int(val): self._apply_thresh(v))
+
+    def _apply_thresh(self, val: int):
+        self._thresh_after_id = None
         engine = self.app.engine
         if engine:
             engine.conf_threshold = val / 100.0

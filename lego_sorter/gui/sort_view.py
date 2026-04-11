@@ -49,6 +49,12 @@ class SortView(BaseView):
         self._fps_time_prev      = time.monotonic()
         self._current_fps        = 0.0
 
+        # Kamera-Status-Cache (verhindert redundante configure()-Aufrufe)
+        self._cam_interval_ms       = int(1000 / max(1, cfg.GUI_STATUS_FPS))
+        self._prev_cam_status_text  = None
+        self._prev_cam_status_color = None
+        self._prev_fps_text         = None
+
         # Zweispaltiges Layout: linke + rechte Spalte gleichgewichtig
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
@@ -305,13 +311,21 @@ class SortView(BaseView):
             status_color = cfg.THEME_DANGER
             self._current_fps = 0.0
 
-        self._lbl_cam_status.configure(text=status_text,
-                                        foreground=status_color)
-        fps_text = f"{self._current_fps:.1f}" if cam and cam.is_open else "–"
-        self._lbl_cam_fps.configure(text=fps_text)
+        # Label nur aktualisieren wenn sich der Wert geändert hat
+        if (status_text != self._prev_cam_status_text
+                or status_color != self._prev_cam_status_color):
+            self._lbl_cam_status.configure(text=status_text,
+                                            foreground=status_color)
+            self._prev_cam_status_text  = status_text
+            self._prev_cam_status_color = status_color
 
-        interval_ms = int(1000 / max(1, cfg.GUI_STATUS_FPS))
-        self._camera_after_id = self.after(interval_ms, self._update_camera)
+        fps_text = f"{self._current_fps:.1f}" if cam and cam.is_open else "–"
+        if fps_text != self._prev_fps_text:
+            self._lbl_cam_fps.configure(text=fps_text)
+            self._prev_fps_text = fps_text
+
+        self._camera_after_id = self.after(self._cam_interval_ms,
+                                            self._update_camera)
 
     # ------------------------------------------------------------------
     # Sensor-Poll (leichtgewichtig, unabhängig von der Kamera)

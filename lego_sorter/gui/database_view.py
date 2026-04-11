@@ -10,6 +10,7 @@ Zeigt:
 """
 
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys, os
@@ -21,7 +22,11 @@ from .base import BaseView
 
 class DatabaseView(BaseView):
 
+    # Mindestabstand (Sekunden) zwischen zwei vollständigen Datenbank-Ladevorgängen
+    _RELOAD_COOLDOWN = 5.0
+
     def _build_ui(self):
+        self._last_load_time: float = 0.0
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -36,7 +41,7 @@ class DatabaseView(BaseView):
         btn_frm = ttk.Frame(header, style="TFrame")
         btn_frm.grid(row=0, column=1, sticky="e")
         ttk.Button(btn_frm, text="🔄  Aktualisieren",
-                   command=self.on_show,
+                   command=self._force_reload,
                    style="Accent.TButton").grid(row=0, column=0, padx=(4, 0))
         ttk.Button(btn_frm, text="🗑  Inventar zurücksetzen",
                    command=self._reset_inventory,
@@ -234,6 +239,14 @@ class DatabaseView(BaseView):
     # ------------------------------------------------------------------
 
     def on_show(self):
+        now = time.monotonic()
+        if now - self._last_load_time < self._RELOAD_COOLDOWN:
+            return
+        threading.Thread(target=self._load_data_bg, daemon=True).start()
+
+    def _force_reload(self):
+        """Erzwingt einen sofortigen Datenbank-Ladevorgang (ignoriert Cooldown)."""
+        self._last_load_time = 0.0
         threading.Thread(target=self._load_data_bg, daemon=True).start()
 
     # ------------------------------------------------------------------
@@ -249,7 +262,7 @@ class DatabaseView(BaseView):
             stats     = db.get_scan_stats()
             orders    = db.get_orders()
             inventory = db.get_inventory()
-            log       = db.get_scan_log(limit=200)
+            log       = db.get_scan_log(limit=100)
             progress  = db.get_order_progress(orders[0]["id"]) if orders else {}
         except Exception:
             return
@@ -258,6 +271,7 @@ class DatabaseView(BaseView):
 
     def _apply_data(self, stats, orders, inventory, log, progress):
         """Aktualisiert alle Widgets im UI-Thread mit den vorab geladenen Daten."""
+        self._last_load_time = time.monotonic()
         self._apply_stats(stats)
         self._apply_orders_combo(orders, progress)
         self._apply_inventory(inventory)
