@@ -64,7 +64,6 @@ LIVE_FPS             = 5     # FPS für Live-Vorschau in der GUI (nur relevant w
 # läuft weiterhin im Hintergrund für Scan-Aufnahmen, aber es wird kein Live-Bild
 # in der GUI dargestellt. Stattdessen zeigt die Statuskarte FPS und
 # Verbindungsstatus an (leichtgewichtig, ideal für Raspberry Pi 3).
-GUI_SHOW_CAMERA_PREVIEW = False
 
 # Update-Frequenz für den Kamera-Status in der GUI (Hz).
 # 2 Hz liefert eine reaktionsschnelle FPS-Anzeige mit minimalem CPU-Aufwand.

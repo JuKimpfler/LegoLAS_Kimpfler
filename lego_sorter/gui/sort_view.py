@@ -285,7 +285,9 @@ class SortView(BaseView):
                 counter = cam.frame_counter
                 self._current_fps = (counter - self._fps_counter_prev) / elapsed
                 self._fps_counter_prev = counter
-            self._fps_time_prev = now
+                self._fps_time_prev = now
+            else:
+                self._fps_time_prev = now
 
         if cam and cam.is_open:
             lag = cam.seconds_since_last_frame
