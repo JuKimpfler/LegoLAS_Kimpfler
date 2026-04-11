@@ -60,14 +60,14 @@ CAMERA_WIDTH         = 640
 CAMERA_HEIGHT        = 480
 LIVE_FPS             = 5     # FPS für Live-Vorschau in der GUI (nur relevant wenn Preview aktiv)
 
-# Kamera-Vorschau in der GUI (standardmäßig deaktiviert für bessere Performance auf Raspberry Pi 3).
-# False = nur leichter Kamera-Status-Text (online/offline, Frame-Zähler, Lag-Erkennung).
-# True  = volles Kamerabild (PIL resize + ImageTk.PhotoImage) – CPU-intensiv.
-GUI_SHOW_CAMERA_PREVIEW = False
+# Kamera-Vorschau in der GUI ist permanent deaktiviert – der Kamera-Manager
+# läuft weiterhin im Hintergrund für Scan-Aufnahmen, aber es wird kein Live-Bild
+# in der GUI dargestellt. Stattdessen zeigt die Statuskarte FPS und
+# Verbindungsstatus an (leichtgewichtig, ideal für Raspberry Pi 3).
 
-# Update-Frequenz für den Kamera-Status-Text in der GUI (Hz).
-# Unabhängig von LIVE_FPS; niedrige Werte (1–2) reichen völlig aus.
-GUI_STATUS_FPS       = 1
+# Update-Frequenz für den Kamera-Status in der GUI (Hz).
+# 2 Hz liefert eine reaktionsschnelle FPS-Anzeige mit minimalem CPU-Aufwand.
+GUI_STATUS_FPS       = 2
 
 # ---------------------------------------------------------------------------
 # Brickognize API
