@@ -42,7 +42,7 @@ class SorterEngine:
 
     Callbacks (alle optional, im GUI-Thread via ``after()`` aufrufen):
       on_state_change(state: SorterState)
-      on_part_identified(part_num, name, score, container)
+      on_part_identified(part_num, name, score, container, color_name)
       on_part_unknown(container=6)
       on_error(message)
     """
@@ -239,26 +239,32 @@ class SorterEngine:
         result = self.api.best_match(image_bytes,
                                      threshold=self._conf_threshold)
         if result:
-            container = self._determine_container(result.part_num)
+            container = self._determine_container(result.part_num,
+                                                  result.color_name)
             data = {
-                "part_num":  result.part_num,
-                "name":      result.name,
-                "score":     result.score,
-                "container": container,
+                "part_num":   result.part_num,
+                "name":       result.name,
+                "score":      result.score,
+                "color_name": result.color_name,
+                "container":  container,
             }
             # In DB speichern
-            self.db.add_part(result.part_num, result.name, container)
+            self.db.add_part(result.part_num, result.name, container,
+                             color_name=result.color_name)
             self.db.log_scan(result.part_num, result.name, result.score,
-                             container, self._active_order_id)
+                             container, self._active_order_id,
+                             color_name=result.color_name)
             if self._mode == SortMode.ORDER and self._active_order_id:
                 self.db.fulfill_order_item(
                     self._active_order_id, result.part_num, container)
 
             if self.on_part_identified:
                 self.on_part_identified(
-                    result.part_num, result.name, result.score, container)
-            logger.info("Teil erkannt: %s → Behälter %d (score=%.2f)",
-                        result.part_num, container, result.score)
+                    result.part_num, result.name, result.score,
+                    container, result.color_name)
+            logger.info("Teil erkannt: %s (%s) → Behälter %d (score=%.2f)",
+                        result.part_num, result.color_name or "–",
+                        container, result.score)
             return data
         else:
             self.db.add_part("???", "Unbekannt", self.FALLBACK_CONTAINER)
@@ -270,24 +276,38 @@ class SorterEngine:
                         self.FALLBACK_CONTAINER)
             return None
 
-    def _determine_container(self, part_num: str) -> int:
+    def _determine_container(self, part_num: str,
+                             color_name: str = "") -> int:
         """
         Bestimmt den Zielbehälter für ein Teil.
 
         Im ORDER_MODE: prüft aktiven Auftrag nach Priorität.
+          - Exakte Übereinstimmung (part_num + color_name) hat Vorrang vor
+            allgemeiner Übereinstimmung (part_num allein, leere color_name).
         Im SORT_MODE:  prüft Inventar, sonst Behälter 1.
         """
         if self._mode == SortMode.ORDER and self._active_order_id:
             items = self.db.get_order_items(self._active_order_id)
-            for item in sorted(items, key=lambda x: x["container"]):
+            unfulfilled = [i for i in items
+                           if i["fulfilled"] < i["required"]]
+            # Exakter Treffer: part_num + color_name stimmen überein
+            for item in sorted(unfulfilled, key=lambda x: x["container"]):
                 if (item["part_num"] == part_num and
-                        item["fulfilled"] < item["required"]):
+                        item.get("color_name", "") == color_name):
                     return item["container"]
+            # Fallback: part_num passt, Auftrag hat keine Farbeinschränkung
+            if color_name:
+                for item in sorted(unfulfilled, key=lambda x: x["container"]):
+                    if (item["part_num"] == part_num and
+                            not item.get("color_name", "")):
+                        return item["container"]
         # SORT_MODE oder Teil nicht im Auftrag: Standardbehälter prüfen
         inventory = self.db.get_inventory()
         for entry in inventory:
             if entry["part_num"] == part_num:
-                return entry["container"]
+                entry_color = entry.get("color_name", "")
+                if not entry_color or entry_color == color_name:
+                    return entry["container"]
         return 1  # Neues Teil → Behälter 1
 
     def _set_state(self, state: SorterState):

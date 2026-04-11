@@ -323,23 +323,25 @@ class LegoLASApp(tk.Tk):
     def _on_engine_state(self, state: SorterState):
         self.after(0, self._update_sort_view_state, state)
 
-    def _on_part_identified(self, part_num, name, score, container):
+    def _on_part_identified(self, part_num, name, score, container,
+                             color_name=""):
         self.after(0, self._update_sort_view_part,
-                   part_num, name, score, container)
+                   part_num, name, score, container, color_name)
 
     def _on_part_unknown(self, container):
         self.after(0, self._update_sort_view_part,
-                   "???", "Unbekannt", 0.0, container)
+                   "???", "Unbekannt", 0.0, container, "")
 
     def _update_sort_view_state(self, state: SorterState):
         view = self._views.get("sort")
         if view:
             view.update_state(state)
 
-    def _update_sort_view_part(self, part_num, name, score, container):
+    def _update_sort_view_part(self, part_num, name, score, container,
+                                color_name=""):
         view = self._views.get("sort")
         if view:
-            view.update_part(part_num, name, score, container)
+            view.update_part(part_num, name, score, container, color_name)
 
     # ------------------------------------------------------------------
     # Hilfsmethoden

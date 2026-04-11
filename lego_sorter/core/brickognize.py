@@ -25,6 +25,7 @@ class BrickResult:
     part_num: str
     name: str
     score: float
+    color_name: str = ""
     img_url: str = ""
     external_sites: dict = field(default_factory=dict)
 
@@ -75,10 +76,12 @@ class BrickognizeClient:
         items = data.get("items", [])
         results: List[BrickResult] = []
         for item in items:
+            color_obj = item.get("color", {}) or {}
             results.append(BrickResult(
                 part_num=str(item.get("id", "")),
                 name=item.get("name", "Unbekannt"),
                 score=float(item.get("score", 0.0)),
+                color_name=str(color_obj.get("name", "") or ""),
                 img_url=item.get("img_url", ""),
                 external_sites=item.get("external_sites", {}),
             ))
