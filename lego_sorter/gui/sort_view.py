@@ -2,7 +2,7 @@
 Sortier-Ansicht für LegoLAS GUI.
 
 Enthält:
-  - Kamera-Statusanzeige (kein Live-Bild, nur Text-Status für bessere Performance)
+  - Kamera-Statusanzeige (kein Live-Bild – nur FPS und Verbindungsstatus)
   - Status-Panel (Zustand, letztes Teil, Behälter)
   - Manuelle Steuerung (Band, Scan, Weiche)
   - Umschaltung Manuell / Automatik
@@ -15,10 +15,8 @@ Tastaturkürzel:
   1–6      – Weiche manuell stellen
 
 Performance-Hinweise (Raspberry Pi 3B):
-  - Kamera-Preview standardmäßig deaktiviert (GUI_SHOW_CAMERA_PREVIEW = False).
-    Stattdessen wird nur ein leichter Status-Text angezeigt (online/offline,
-    Frame-Zähler, Lag-Erkennung). Dies spart erheblich CPU/RAM auf dem Pi 3.
-  - Preview kann in config.py mit GUI_SHOW_CAMERA_PREVIEW = True wieder aktiviert werden.
+  - Kein Live-Kamerabild in der GUI – spart erheblich CPU/RAM auf dem Pi 3.
+  - Stattdessen wird eine leichte Statuskarte angezeigt (online/offline, FPS).
   - Kamera-Loop und Sensor-Loop sind entkoppelt.
   - Beide Loops werden bei on_hide() pausiert und bei on_show() fortgesetzt.
   - Label-Updates erfolgen nur bei tatsächlichen Wertänderungen.
@@ -29,6 +27,7 @@ Performance-Hinweise (Raspberry Pi 3B):
 import tkinter as tk
 from tkinter import ttk, messagebox
 import math
+import time
 import sys, os
 import threading
 
@@ -37,41 +36,63 @@ import config as cfg
 from core.sorter_engine import SorterState, SortMode
 from .base import BaseView
 
-try:
-    from PIL import ImageTk
-    _PIL = True
-except ImportError:
-    _PIL = False
-
 
 class SortView(BaseView):
 
     def _build_ui(self):
-        self._last_frame_counter = -1   # Change-Detection für Kamera-Update
-        self._sensor_state       = None  # Letzter bekannter Sensor-Zustand
-        self._camera_after_id    = None  # ID des laufenden after()-Callbacks
+        self._sensor_state       = None   # Letzter bekannter Sensor-Zustand
+        self._camera_after_id    = None   # ID des laufenden after()-Callbacks
         self._sensor_after_id    = None
 
-        self.columnconfigure(0, weight=3)
-        self.columnconfigure(1, weight=2)
+        # FPS-Berechnung
+        self._fps_counter_prev   = 0
+        self._fps_time_prev      = time.monotonic()
+        self._current_fps        = 0.0
+
+        # Zweispaltiges Layout: linke + rechte Spalte gleichgewichtig
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
-        # ── Linke Seite: Kamera ───────────────────────────────────────────
-        cam_outer = ttk.Frame(self, style="Surface.TFrame")
-        cam_outer.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
-        cam_outer.rowconfigure(1, weight=1)
-        cam_outer.columnconfigure(0, weight=1)
+        # ── Linke Spalte: Kamera-Status + Moduswahl ───────────────────────
+        left_frame = ttk.Frame(self, style="TFrame")
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
+        left_frame.columnconfigure(0, weight=1)
 
-        # Kopfzeile der Kamera-Karte
-        cam_header = ttk.Frame(cam_outer, style="Surface.TFrame")
-        cam_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
-        cam_header.columnconfigure(1, weight=1)
+        self._build_camera_status(left_frame)
+        self._build_mode_switcher(left_frame)
 
-        ttk.Label(cam_header, text="📷  Live-Kamera",
-                  style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        # ── Rechte Spalte: Systemstatus + Steuerung ───────────────────────
+        right_frame = ttk.Frame(self, style="TFrame")
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
+        right_frame.columnconfigure(0, weight=1)
+
+        self._build_status(right_frame)
+        self._build_manual_controls(right_frame)
+        self._build_container_buttons(right_frame)
+
+    # ------------------------------------------------------------------
+    # Kamera-Statuskarte (leichtgewichtig – kein Live-Bild)
+    # ------------------------------------------------------------------
+
+    def _build_camera_status(self, parent):
+        frm = ttk.Frame(parent, style="Surface.TFrame")
+        frm.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        frm.columnconfigure(1, weight=1)
+
+        # Kopfzeile: Titel + Sensor-Indikator
+        header = ttk.Frame(frm, style="Surface.TFrame")
+        header.grid(row=0, column=0, columnspan=2, sticky="ew",
+                    padx=10, pady=(8, 4))
+        header.columnconfigure(1, weight=1)
+
+        ttk.Label(header, text="📷  Kamera",
+                  style="Surface.TLabel",
+                  font=(cfg.FONT_BODY[0], cfg.FONT_BODY[1], "bold")).grid(
+            row=0, column=0, sticky="w")
 
         self._lbl_sensor = tk.Label(
-            cam_header,
+            header,
             text="○  frei",
             bg=cfg.THEME_SURFACE,
             fg=cfg.THEME_ACCENT2,
@@ -80,25 +101,27 @@ class SortView(BaseView):
         )
         self._lbl_sensor.grid(row=0, column=1, sticky="e", padx=(8, 0))
 
-        # Kamerabild
-        self._cam_label = tk.Label(
-            cam_outer,
-            bg=cfg.THEME_SURFACE,
-            text="Kamera wird initialisiert…",
-            fg=cfg.THEME_MUTED,
-            font=cfg.FONT_BODY,
-        )
-        self._cam_label.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
+        ttk.Separator(frm, orient="horizontal").grid(
+            row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 4))
 
-        # ── Rechte Seite: Steuerung ───────────────────────────────────────
-        ctrl_frame = ttk.Frame(self, style="TFrame")
-        ctrl_frame.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
-        ctrl_frame.columnconfigure(0, weight=1)
+        # Verbindungsstatus
+        ttk.Label(frm, text="Status:",
+                  style="Surface.Muted.TLabel").grid(
+            row=2, column=0, padx=10, pady=5, sticky="w")
+        self._lbl_cam_status = ttk.Label(frm, text="–",
+                                          style="Surface.TLabel",
+                                          foreground=cfg.THEME_MUTED)
+        self._lbl_cam_status.grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
-        self._build_status(ctrl_frame)
-        self._build_mode_switcher(ctrl_frame)
-        self._build_manual_controls(ctrl_frame)
-        self._build_container_buttons(ctrl_frame)
+        # FPS-Anzeige
+        ttk.Label(frm, text="FPS:",
+                  style="Surface.Muted.TLabel").grid(
+            row=3, column=0, padx=10, pady=(0, 10), sticky="w")
+        self._lbl_cam_fps = ttk.Label(frm, text="–",
+                                       style="Surface.TLabel",
+                                       foreground=cfg.THEME_MUTED)
+        self._lbl_cam_fps.grid(row=3, column=1, padx=10, pady=(0, 10),
+                                sticky="w")
 
     # ------------------------------------------------------------------
     # Status-Panel
@@ -201,7 +224,7 @@ class SortView(BaseView):
 
     def _build_manual_controls(self, parent):
         frm = ttk.Frame(parent, style="Surface.TFrame")
-        frm.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        frm.grid(row=1, column=0, sticky="ew", pady=(0, 6))
         frm.columnconfigure((0, 1), weight=1)
 
         ttk.Label(frm, text="Manuelle Steuerung",
@@ -228,7 +251,7 @@ class SortView(BaseView):
 
     def _build_container_buttons(self, parent):
         frm = ttk.Frame(parent, style="Surface.TFrame")
-        frm.grid(row=3, column=0, sticky="ew", pady=(0, 6))
+        frm.grid(row=2, column=0, sticky="ew", pady=(0, 6))
         for i in range(6):
             frm.columnconfigure(i, weight=1)
 
@@ -247,7 +270,7 @@ class SortView(BaseView):
                 row=2, column=i - 1, padx=3, pady=(0, 8), sticky="ew")
 
     # ------------------------------------------------------------------
-    # Kamera-Update (entkoppelt vom Sensor-Poll)
+    # Kamera-Status-Update (leichtgewichtig – kein Live-Bild)
     # ------------------------------------------------------------------
 
     def _update_camera(self):
@@ -255,41 +278,37 @@ class SortView(BaseView):
             return
         cam = self.app.camera
 
-        if cfg.GUI_SHOW_CAMERA_PREVIEW:
-            # ── Vollbild-Preview (CPU-intensiv, für stärkere Hardware) ──────
-            if cam and cam.is_open and _PIL:
-                current_counter = cam.frame_counter
-                if current_counter != self._last_frame_counter:
-                    self._last_frame_counter = current_counter
-                    w = self._cam_label.winfo_width() or 400
-                    h = self._cam_label.winfo_height() or 300
-                    if w < 10:
-                        w, h = 400, 300
-                    img = cam.get_pil_image(width=w, height=h)
-                    if img:
-                        photo = ImageTk.PhotoImage(img)
-                        self._cam_label.configure(image=photo, text="")
-                        self._cam_label.image = photo  # Referenz halten
-            interval_ms = int(1000 / max(1, cfg.LIVE_FPS))
-        else:
-            # ── Leichter Status-Text (Standard für Raspberry Pi 3) ──────────
-            if cam and cam.is_open:
+        now = time.monotonic()
+        elapsed = now - self._fps_time_prev
+        if elapsed >= 1.0:
+            if cam:
                 counter = cam.frame_counter
-                lag = cam.seconds_since_last_frame
-                if math.isinf(lag):
-                    status = "📷  Kamera: verbunden – warte auf ersten Frame…"
-                elif lag > 5:
-                    status = (f"⚠️  Kamera: hängt – kein neuer Frame seit "
-                              f"{lag:.0f} s  |  Frames: {counter}")
-                else:
-                    if counter != self._last_frame_counter:
-                        self._last_frame_counter = counter
-                    status = f"✅  Kamera: OK  |  Frames: {counter}"
-            else:
-                status = "❌  Kamera: offline – DroidCam-URL in config.py prüfen"
-            self._cam_label.configure(image="", text=status)
-            interval_ms = int(1000 / max(1, cfg.GUI_STATUS_FPS))
+                self._current_fps = (counter - self._fps_counter_prev) / elapsed
+                self._fps_counter_prev = counter
+            self._fps_time_prev = now
 
+        if cam and cam.is_open:
+            lag = cam.seconds_since_last_frame
+            if math.isinf(lag):
+                status_text  = "verbunden – warte auf Frame…"
+                status_color = cfg.THEME_WARNING
+            elif lag > 5:
+                status_text  = f"⚠️  hängt ({lag:.0f} s kein Frame)"
+                status_color = cfg.THEME_DANGER
+            else:
+                status_text  = "✅  verbunden"
+                status_color = cfg.THEME_ACCENT2
+        else:
+            status_text  = "❌  offline"
+            status_color = cfg.THEME_DANGER
+            self._current_fps = 0.0
+
+        self._lbl_cam_status.configure(text=status_text,
+                                        foreground=status_color)
+        fps_text = f"{self._current_fps:.1f}" if cam and cam.is_open else "–"
+        self._lbl_cam_fps.configure(text=fps_text)
+
+        interval_ms = int(1000 / max(1, cfg.GUI_STATUS_FPS))
         self._camera_after_id = self.after(interval_ms, self._update_camera)
 
     # ------------------------------------------------------------------
