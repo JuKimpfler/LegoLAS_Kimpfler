@@ -392,8 +392,12 @@ class SortView(BaseView):
         if not gpio or not db:
             return
         positions = db.get_servo_positions()
-        gpio.servo_to_position(n, positions)
         self._lbl_container.configure(text=f"Weiche → {n}")
+        threading.Thread(
+            target=gpio.servo_to_position,
+            args=(n, positions),
+            daemon=True,
+        ).start()
 
     def _on_mode_change(self):
         engine = self.app.engine

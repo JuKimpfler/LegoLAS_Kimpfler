@@ -68,6 +68,10 @@ class SorterEngine:
         self._servo_positions: dict = {}
         self._reload_servo_positions()
 
+        # Inventar-Cache (lazy, wird bei erstem Zugriff oder nach Änderung geladen)
+        self._inventory_cache: list = []
+        self._inventory_dirty: bool = True
+
         # Einstellungen
         self._belt_speed     = config.DEFAULT_BELT_SPEED
         self._conf_threshold = config.DEFAULT_CONF_THRESHOLD
@@ -198,7 +202,6 @@ class SorterEngine:
             # 4. Servo einstellen und warten bis er sicher angekommen ist
             #    (servo_set_angle blockiert bereits für SERVO_MOVE_DELAY)
             self._set_state(SorterState.SORTING)
-            self._reload_servo_positions()
             self.gpio.servo_to_position(container, self._servo_positions)
 
             # 5. Band wieder starten und warten bis das Teil
@@ -251,6 +254,7 @@ class SorterEngine:
             # In DB speichern
             self.db.add_part(result.part_num, result.name, container,
                              color_name=result.color_name)
+            self._inventory_dirty = True  # Cache nach Schreibzugriff invalidieren
             self.db.log_scan(result.part_num, result.name, result.score,
                              container, self._active_order_id,
                              color_name=result.color_name)
@@ -268,6 +272,7 @@ class SorterEngine:
             return data
         else:
             self.db.add_part("???", "Unbekannt", self.FALLBACK_CONTAINER)
+            self._inventory_dirty = True  # Cache invalidieren
             self.db.log_scan("???", "Unbekannt", 0.0, self.FALLBACK_CONTAINER,
                              self._active_order_id)
             if self.on_part_unknown:
@@ -284,7 +289,7 @@ class SorterEngine:
         Im ORDER_MODE: prüft aktiven Auftrag nach Priorität.
           - Exakte Übereinstimmung (part_num + color_name) hat Vorrang vor
             allgemeiner Übereinstimmung (part_num allein, leere color_name).
-        Im SORT_MODE:  prüft Inventar, sonst Behälter 1.
+        Im SORT_MODE:  prüft Inventar-Cache, sonst Behälter 1.
         """
         if self._mode == SortMode.ORDER and self._active_order_id:
             items = self.db.get_order_items(self._active_order_id)
@@ -301,9 +306,11 @@ class SorterEngine:
                     if (item["part_num"] == part_num and
                             not item.get("color_name", "")):
                         return item["container"]
-        # SORT_MODE oder Teil nicht im Auftrag: Standardbehälter prüfen
-        inventory = self.db.get_inventory()
-        for entry in inventory:
+        # SORT_MODE oder Teil nicht im Auftrag: gecachtes Inventar prüfen
+        if self._inventory_dirty:
+            self._inventory_cache = self.db.get_inventory()
+            self._inventory_dirty = False
+        for entry in self._inventory_cache:
             if entry["part_num"] == part_num:
                 entry_color = entry.get("color_name", "")
                 if not entry_color or entry_color == color_name:
@@ -319,3 +326,7 @@ class SorterEngine:
 
     def _reload_servo_positions(self):
         self._servo_positions = self.db.get_servo_positions()
+
+    def invalidate_servo_positions(self):
+        """Servo-Positionen neu laden (nach Kalibrierungsänderung aufrufen)."""
+        self._reload_servo_positions()

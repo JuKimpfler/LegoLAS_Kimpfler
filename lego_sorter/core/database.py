@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -35,6 +36,7 @@ class Database:
         self.cfg = config
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self._conn: Optional[sqlite3.Connection] = None
+        self._lock = threading.RLock()   # Serialisiert alle DB-Zugriffe über Threads
         self._connect()
         self._create_tables()
         self._migrate_schema()
@@ -169,39 +171,43 @@ class Database:
     def add_part(self, part_num: str, name: str,
                  container: int, count: int = 1, color_name: str = ""):
         """Erhöht den Bestand eines Teils im angegebenen Behälter."""
-        cur = self._conn.cursor()
-        cur.execute("""
-            INSERT INTO inventory (part_num, name, color_name, container, count, updated_at)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))
-            ON CONFLICT(part_num, color_name, container) DO UPDATE SET
-                count      = count + excluded.count,
-                name       = excluded.name,
-                updated_at = datetime('now')
-        """, (part_num, name, color_name, container, count))
-        self._conn.commit()
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("""
+                INSERT INTO inventory (part_num, name, color_name, container, count, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(part_num, color_name, container) DO UPDATE SET
+                    count      = count + excluded.count,
+                    name       = excluded.name,
+                    updated_at = datetime('now')
+            """, (part_num, name, color_name, container, count))
+            self._conn.commit()
 
     def get_inventory(self) -> List[dict]:
         """Gibt alle Inventareinträge zurück."""
-        cur = self._conn.cursor()
-        cur.execute("""
-            SELECT part_num, name, color_name, container, count, updated_at
-            FROM inventory ORDER BY container, part_num
-        """)
-        return [dict(row) for row in cur.fetchall()]
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("""
+                SELECT part_num, name, color_name, container, count, updated_at
+                FROM inventory ORDER BY container, part_num
+            """)
+            return [dict(row) for row in cur.fetchall()]
 
     def get_part_total(self, part_num: str) -> int:
         """Gesamtanzahl aller Einträge für eine Teilenummer."""
-        cur = self._conn.cursor()
-        cur.execute(
-            "SELECT COALESCE(SUM(count),0) FROM inventory WHERE part_num=?",
-            (part_num,),
-        )
-        return cur.fetchone()[0]
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute(
+                "SELECT COALESCE(SUM(count),0) FROM inventory WHERE part_num=?",
+                (part_num,),
+            )
+            return cur.fetchone()[0]
 
     def reset_inventory(self):
         """Löscht alle Inventareinträge."""
-        self._conn.execute("DELETE FROM inventory")
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DELETE FROM inventory")
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Scan-Log
@@ -209,30 +215,33 @@ class Database:
 
     def log_scan(self, part_num: str, name: str, score: float,
                  container: int, order_id: int = None, color_name: str = ""):
-        self._conn.execute("""
-            INSERT INTO scan_log (part_num, name, color_name, score, container, order_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (part_num, name, color_name, score, container, order_id))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("""
+                INSERT INTO scan_log (part_num, name, color_name, score, container, order_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (part_num, name, color_name, score, container, order_id))
+            self._conn.commit()
 
     def get_scan_log(self, limit: int = 200) -> List[dict]:
-        cur = self._conn.cursor()
-        cur.execute("""
-            SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT ?
-        """, (limit,))
-        return [dict(row) for row in cur.fetchall()]
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("""
+                SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cur.fetchall()]
 
     def get_scan_stats(self) -> dict:
         """Gibt Statistiken zurück: Scans gesamt, Teile je Behälter."""
-        cur = self._conn.cursor()
-        cur.execute("SELECT COUNT(*) AS total FROM scan_log")
-        total = cur.fetchone()["total"]
-        cur.execute("""
-            SELECT container, COUNT(*) AS cnt FROM scan_log
-            GROUP BY container ORDER BY container
-        """)
-        per_container = {row["container"]: row["cnt"]
-                         for row in cur.fetchall()}
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("SELECT COUNT(*) AS total FROM scan_log")
+            total = cur.fetchone()["total"]
+            cur.execute("""
+                SELECT container, COUNT(*) AS cnt FROM scan_log
+                GROUP BY container ORDER BY container
+            """)
+            per_container = {row["container"]: row["cnt"]
+                             for row in cur.fetchall()}
         return {"total": total, "per_container": per_container}
 
     # ------------------------------------------------------------------
@@ -240,25 +249,28 @@ class Database:
     # ------------------------------------------------------------------
 
     def get_servo_positions(self) -> Dict[int, float]:
-        cur = self._conn.cursor()
-        cur.execute("SELECT slot, angle FROM servo_cal ORDER BY slot")
-        return {row["slot"]: row["angle"] for row in cur.fetchall()}
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("SELECT slot, angle FROM servo_cal ORDER BY slot")
+            return {row["slot"]: row["angle"] for row in cur.fetchall()}
 
     def set_servo_position(self, slot: int, angle: float):
-        self._conn.execute("""
-            INSERT INTO servo_cal (slot, angle) VALUES (?,?)
-            ON CONFLICT(slot) DO UPDATE SET angle = excluded.angle
-        """, (slot, angle))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("""
+                INSERT INTO servo_cal (slot, angle) VALUES (?,?)
+                ON CONFLICT(slot) DO UPDATE SET angle = excluded.angle
+            """, (slot, angle))
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Einstellungen
     # ------------------------------------------------------------------
 
     def get_setting(self, key: str, default=None):
-        cur = self._conn.cursor()
-        cur.execute("SELECT value FROM settings WHERE key=?", (key,))
-        row = cur.fetchone()
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("SELECT value FROM settings WHERE key=?", (key,))
+            row = cur.fetchone()
         if row is None:
             return default
         try:
@@ -267,11 +279,12 @@ class Database:
             return row["value"]
 
     def set_setting(self, key: str, value):
-        self._conn.execute("""
-            INSERT INTO settings (key, value) VALUES (?,?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """, (key, json.dumps(value)))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("""
+                INSERT INTO settings (key, value) VALUES (?,?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """, (key, json.dumps(value)))
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Auftragsmanagement
@@ -292,54 +305,59 @@ class Database:
         -------
         Neue Auftrags-ID.
         """
-        cur = self._conn.cursor()
-        cur.execute(
-            "INSERT INTO orders (name) VALUES (?)", (name,))
-        order_id = cur.lastrowid
-        for part_num, color_name, container, required in items:
-            cur.execute("""
-                INSERT INTO order_items (order_id, part_num, color_name, container, required)
-                VALUES (?,?,?,?,?)
-            """, (order_id, part_num, color_name, container, required))
-        self._conn.commit()
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute(
+                "INSERT INTO orders (name) VALUES (?)", (name,))
+            order_id = cur.lastrowid
+            for part_num, color_name, container, required in items:
+                cur.execute("""
+                    INSERT INTO order_items (order_id, part_num, color_name, container, required)
+                    VALUES (?,?,?,?,?)
+                """, (order_id, part_num, color_name, container, required))
+            self._conn.commit()
         return order_id
 
     def get_orders(self) -> List[dict]:
-        cur = self._conn.cursor()
-        cur.execute("SELECT * FROM orders ORDER BY id DESC")
-        return [dict(row) for row in cur.fetchall()]
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("SELECT * FROM orders ORDER BY id DESC")
+            return [dict(row) for row in cur.fetchall()]
 
     def get_order_items(self, order_id: int) -> List[dict]:
-        cur = self._conn.cursor()
-        cur.execute("""
-            SELECT * FROM order_items WHERE order_id=?
-            ORDER BY container, part_num
-        """, (order_id,))
-        return [dict(row) for row in cur.fetchall()]
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("""
+                SELECT * FROM order_items WHERE order_id=?
+                ORDER BY container, part_num
+            """, (order_id,))
+            return [dict(row) for row in cur.fetchall()]
 
     def fulfill_order_item(self, order_id: int, part_num: str,
                            container: int, amount: int = 1):
         """Erhöht fulfilled-Zähler für ein Auftragsitem."""
-        self._conn.execute("""
-            UPDATE order_items
-            SET fulfilled = MIN(fulfilled + ?, required)
-            WHERE order_id=? AND part_num=? AND container=?
-        """, (amount, order_id, part_num, container))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("""
+                UPDATE order_items
+                SET fulfilled = MIN(fulfilled + ?, required)
+                WHERE order_id=? AND part_num=? AND container=?
+            """, (amount, order_id, part_num, container))
+            self._conn.commit()
         self._check_order_completion(order_id)
 
     def _check_order_completion(self, order_id: int):
-        cur = self._conn.cursor()
-        cur.execute("""
-            SELECT COUNT(*) AS remaining
-            FROM order_items
-            WHERE order_id=? AND fulfilled < required
-        """, (order_id,))
-        remaining = cur.fetchone()["remaining"]
-        if remaining == 0:
-            self._conn.execute(
-                "UPDATE orders SET completed=1 WHERE id=?", (order_id,))
-            self._conn.commit()
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("""
+                SELECT COUNT(*) AS remaining
+                FROM order_items
+                WHERE order_id=? AND fulfilled < required
+            """, (order_id,))
+            remaining = cur.fetchone()["remaining"]
+            if remaining == 0:
+                self._conn.execute(
+                    "UPDATE orders SET completed=1 WHERE id=?", (order_id,))
+                self._conn.commit()
 
     def get_order_progress(self, order_id: int) -> Dict[int, dict]:
         """
@@ -360,8 +378,9 @@ class Database:
         return result
 
     def delete_order(self, order_id: int):
-        self._conn.execute("DELETE FROM orders WHERE id=?", (order_id,))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DELETE FROM orders WHERE id=?", (order_id,))
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Import / Export

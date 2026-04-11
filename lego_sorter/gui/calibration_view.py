@@ -11,6 +11,7 @@ Erlaubt:
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys, os
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as cfg
@@ -23,6 +24,10 @@ class CalibrationView(BaseView):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
         self.rowconfigure(2, weight=1)
+
+        # Interner Zustand für non-blocking Servo-Ansteuerung
+        self._servo_busy    = False   # True wenn Servo-Thread aktiv
+        self._pending_angle = None    # Letzter gewünschter Winkel während Servo beschäftigt
 
         # Titel
         ttk.Label(self, text="⚙️  Servo-Kalibrierung",
@@ -52,6 +57,8 @@ class CalibrationView(BaseView):
             row=0, column=0, padx=16, pady=(16, 4), sticky="w")
 
         self._angle_var = tk.DoubleVar(value=0.0)
+        # Winkel-Label via Variable-Trace aktualisieren (kein Servo-Aufruf)
+        self._angle_var.trace_add("write", self._on_angle_var_changed)
         self._lbl_angle = ttk.Label(ctrl,
                                     text="0.0 °",
                                     foreground=cfg.THEME_ACCENT,
@@ -68,8 +75,11 @@ class CalibrationView(BaseView):
             row=3, column=0, padx=16, pady=(10, 2), sticky="w")
         self._slider = ttk.Scale(ctrl, from_=0, to=180,
                                  orient="horizontal",
-                                 variable=self._angle_var,
-                                 command=self._on_slider)
+                                 variable=self._angle_var)
+        # Servo erst beim Loslassen der Maus ansteuern (verhindert Flut von
+        # blockierenden Aufrufen bei jedem Drag-Pixel)
+        self._slider.bind("<ButtonRelease-1>",
+                          lambda e: self._send_servo_async(self._angle_var.get()))
         self._slider.grid(row=4, column=0, padx=16, pady=(0, 12), sticky="ew")
 
         ttk.Separator(ctrl, orient="horizontal").grid(
@@ -172,30 +182,66 @@ class CalibrationView(BaseView):
     # Steuerung
     # ------------------------------------------------------------------
 
+    def _on_angle_var_changed(self, *_):
+        """Aktualisiert nur das Anzeige-Label – kein Servo-Aufruf."""
+        self._lbl_angle.configure(text=f"{self._angle_var.get():.1f} °")
+
     def _step(self, delta: float):
         new_angle = max(0, min(180, self._angle_var.get() + delta))
         self._angle_var.set(new_angle)
-        self._apply_angle(new_angle)
-
-    def _on_slider(self, _value=None):
-        angle = self._angle_var.get()
-        self._apply_angle(angle)
+        self._send_servo_async(new_angle)
 
     def _apply_angle(self, angle: float):
+        """Label aktualisieren und Servo asynchron ansteuern."""
         self._lbl_angle.configure(text=f"{angle:.1f} °")
-        gpio = self.app.gpio
-        if gpio:
-            gpio.servo_set_angle(angle)
+        self._send_servo_async(angle)
 
     def _go_home(self):
         self._angle_var.set(0)
-        self._apply_angle(0)
+        self._send_servo_async(0)
+
+    def _send_servo_async(self, angle: float):
+        """
+        Bewegt den Servo in einem Hintergrund-Thread.
+
+        Wenn der Servo bereits beschäftigt ist (SERVO_MOVE_DELAY), wird der
+        neue Winkel als „ausstehend" gespeichert und erst nach Abschluss der
+        laufenden Bewegung ausgeführt (Latest-Wins-Strategie).
+        """
+        gpio = self.app.gpio
+        if not gpio:
+            return
+        if self._servo_busy:
+            self._pending_angle = angle
+            return
+        self._servo_busy = True
+        self._pending_angle = None
+
+        def _run():
+            try:
+                gpio.servo_set_angle(angle)
+            finally:
+                self.after(0, self._on_servo_done)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_servo_done(self):
+        """Wird im Main-Thread aufgerufen, wenn der Servo-Thread fertig ist."""
+        self._servo_busy = False
+        pending = self._pending_angle
+        if pending is not None:
+            self._pending_angle = None
+            self._send_servo_async(pending)
 
     def _save_slot(self, slot: int):
         angle = self._angle_var.get()
         db = self.app.db
         if db:
             db.set_servo_position(slot, angle)
+            # Engine-Servo-Cache aktualisieren
+            engine = self.app.engine
+            if engine:
+                engine.invalidate_servo_positions()
             self._refresh_table()
             messagebox.showinfo(
                 "Gespeichert",
@@ -214,7 +260,7 @@ class CalibrationView(BaseView):
         positions = db.get_servo_positions()
         angle = positions.get(slot, 0)
         self._angle_var.set(angle)
-        self._apply_angle(angle)
+        self._send_servo_async(angle)
 
     # ------------------------------------------------------------------
     # Tabelle aktualisieren

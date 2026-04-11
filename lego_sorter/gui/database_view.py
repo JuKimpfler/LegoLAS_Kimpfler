@@ -12,6 +12,7 @@ Zeigt:
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys, os
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as cfg
@@ -242,7 +243,16 @@ class DatabaseView(BaseView):
         db = self.app.db
         if not db:
             return
-        stats = db.get_scan_stats()
+
+        def _fetch():
+            stats = db.get_scan_stats()
+            self.after(0, lambda: self._populate_stats(stats))
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _populate_stats(self, stats: dict):
+        if not self.winfo_exists():
+            return
         self._lbl_total.configure(text=str(stats["total"]))
         per_c = stats["per_container"]
         max_val = max(per_c.values(), default=1)
@@ -256,7 +266,17 @@ class DatabaseView(BaseView):
         db = self.app.db
         if not db:
             return
-        self._orders_cache = db.get_orders()
+
+        def _fetch():
+            orders = db.get_orders()
+            self.after(0, lambda: self._populate_orders_combo(orders))
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _populate_orders_combo(self, orders: list):
+        if not self.winfo_exists():
+            return
+        self._orders_cache = orders
         names = [o["name"] for o in self._orders_cache]
         self._prog_combo["values"] = names
         if names:
@@ -275,7 +295,16 @@ class DatabaseView(BaseView):
                 break
         if order_id is None:
             return
-        progress = db.get_order_progress(order_id)
+
+        def _fetch():
+            progress = db.get_order_progress(order_id)
+            self.after(0, lambda: self._populate_progress(progress))
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _populate_progress(self, progress: dict):
+        if not self.winfo_exists():
+            return
         for i in range(1, 7):
             d = progress.get(i, {"required": 0, "fulfilled": 0, "percent": 0})
             self._prog_bars[i].set(d["percent"])
@@ -283,12 +312,22 @@ class DatabaseView(BaseView):
                 text=f"{d['fulfilled']} / {d['required']}")
 
     def _refresh_inventory(self):
-        for row in self._inv_tree.get_children():
-            self._inv_tree.delete(row)
         db = self.app.db
         if not db:
             return
-        for item in db.get_inventory():
+
+        def _fetch():
+            data = db.get_inventory()
+            self.after(0, lambda: self._populate_inventory(data))
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _populate_inventory(self, data: list):
+        if not self.winfo_exists():
+            return
+        for row in self._inv_tree.get_children():
+            self._inv_tree.delete(row)
+        for item in data:
             self._inv_tree.insert("", "end", values=(
                 item["part_num"],
                 item["name"],
@@ -299,12 +338,22 @@ class DatabaseView(BaseView):
             ))
 
     def _refresh_log(self):
-        for row in self._log_tree.get_children():
-            self._log_tree.delete(row)
         db = self.app.db
         if not db:
             return
-        for entry in db.get_scan_log(limit=200):
+
+        def _fetch():
+            data = db.get_scan_log(limit=200)
+            self.after(0, lambda: self._populate_log(data))
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _populate_log(self, data: list):
+        if not self.winfo_exists():
+            return
+        for row in self._log_tree.get_children():
+            self._log_tree.delete(row)
+        for entry in data:
             self._log_tree.insert("", "end", values=(
                 entry["scanned_at"][:16],
                 entry["part_num"],

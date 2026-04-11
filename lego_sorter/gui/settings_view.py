@@ -305,18 +305,26 @@ class SettingsView(BaseView):
         db = self.app.db
         if not om or not db:
             return
-        try:
-            name, items = om.import_order(path)
-            order_id = db.create_order(name, items)
+
+        def _run():
+            try:
+                name, items = om.import_order(path)
+                order_id = db.create_order(name, items)
+                self.after(0, lambda: _done(name, len(items), order_id))
+            except Exception as exc:
+                self.after(0, lambda msg=str(exc):
+                           messagebox.showerror("Fehler", msg, parent=self))
+
+        def _done(name, count, order_id):
             messagebox.showinfo(
                 "Importiert",
-                f"Auftrag '{name}' mit {len(items)} Positionen importiert "
+                f"Auftrag '{name}' mit {count} Positionen importiert "
                 f"(ID={order_id}).",
                 parent=self,
             )
             self._refresh_orders()
-        except Exception as exc:
-            messagebox.showerror("Fehler", str(exc), parent=self)
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def _import_from_rebrickable(self):
         set_id = self._rb_set_id_var.get().strip()
